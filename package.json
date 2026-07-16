@@ -1,0 +1,20 @@
+{
+  "name": "opencode-chat-render",
+  "module": "render.ts",
+  "scripts": {
+    "render": "bun render.ts"
+  },
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^26.1.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "markdown-it": "^14.3.0"
+  }
+}
