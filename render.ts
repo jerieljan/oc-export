@@ -29,6 +29,7 @@ interface Turn {
   thinking: string[];
   tools: ToolCall[];
   content: string;
+  synthetic: string[];
 }
 
 // JSON export format produced by Opencode.
@@ -69,6 +70,7 @@ interface JsonMessageInfo {
 interface JsonPart {
   type: string;
   text?: string;
+  synthetic?: boolean;
   tool?: string;
   callID?: string;
   state?: JsonToolState;
@@ -133,7 +135,7 @@ function parseSession(text: string): { meta: SessionMeta; turns: Turn[] } {
 
     if (firstLine.startsWith("## User")) {
       const content = lines.slice(1).join("\n").trim();
-      turns.push({ role: "user", thinking: [], tools: [], content });
+      turns.push({ role: "user", thinking: [], tools: [], content, synthetic: [] });
       continue;
     }
 
@@ -151,6 +153,7 @@ function parseSession(text: string): { meta: SessionMeta; turns: Turn[] } {
       thinking: [],
       tools: [],
       content: block,
+      synthetic: [],
     });
   }
 
@@ -182,7 +185,8 @@ function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Tur
         role: "user",
         thinking: [],
         tools: [],
-        content: collectTextParts(message.parts),
+        content: collectTextParts(message.parts, false),
+        synthetic: collectSyntheticParts(message.parts),
       });
       continue;
     }
@@ -198,6 +202,7 @@ function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Tur
         thinking: [],
         tools: [],
         content: "",
+        synthetic: [],
       };
       assistantBuckets.set(parentID, turn);
       turns.push(turn);
@@ -234,11 +239,17 @@ function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Tur
   return { meta, turns };
 }
 
-function collectTextParts(parts: JsonPart[]): string {
+function collectTextParts(parts: JsonPart[], includeSynthetic = true): string {
   return parts
-    .filter((p) => p.type === "text" && p.text)
+    .filter((p) => p.type === "text" && p.text && (includeSynthetic || !p.synthetic))
     .map((p) => p.text!)
     .join("\n\n");
+}
+
+function collectSyntheticParts(parts: JsonPart[]): string[] {
+  return parts
+    .filter((p) => p.type === "text" && p.text && p.synthetic)
+    .map((p) => p.text!);
 }
 
 function joinContent(existing: string, addition: string): string {
@@ -285,6 +296,7 @@ function parseAssistantTurn(header: string, body: string): Turn {
     thinking: [],
     tools: [],
     content: "",
+    synthetic: [],
   };
 
   let remaining = body.trimStart();
@@ -425,6 +437,9 @@ function buildPage(meta: SessionMeta, turns: Turn[]): string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${title}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=Geist+Mono:wght@400;500&family=League+Spartan:wght@600;700&display=swap">
 <style>
 ${styles()}
 </style>
@@ -455,13 +470,32 @@ ${scripts()}
 }
 
 function renderUserTurn(turn: Turn, index: number): string {
-  const content = md.render(turn.content);
+  const messageBlock = turn.content.trim()
+    ? `<div class="message user-message">\n    ${md.render(turn.content)}\n  </div>`
+    : "";
+
+  let syntheticBlock = "";
+  if (turn.synthetic.length > 0) {
+    const body = turn.synthetic
+      .map(
+        (text) =>
+          `<pre class="synthetic-code"><code>${escapeHtml(text)}</code></pre>`,
+      )
+      .join("\n");
+    syntheticBlock = `
+<details class="collapsible synthetic">
+  <summary>Injected context (${turn.synthetic.length})</summary>
+  ${body}
+</details>`;
+  }
+
   return `
 <article class="turn user-turn" id="turn-${index}">
-  <div class="turn-badge">User</div>
-  <div class="message user-message">
-    ${content}
+  <div class="turn-header">
+    <div class="turn-badge user-badge">User</div>
   </div>
+  ${messageBlock}
+  ${syntheticBlock}
 </article>`;
 }
 
@@ -522,30 +556,46 @@ function renderAssistantTurn(turn: Turn, index: number): string {
 function styles(): string {
   return `
 :root {
-  --accent: #64748b;
-  --accent-dark: #475569;
-  --accent-light: #94a3b8;
-  --bg: #f8fafc;
+  --font-body: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: "League Spartan", "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --accent: #62748e;
+  --accent-dark: #45556c;
+  --accent-light: #90a1b9;
+  --bg: #f1f5f9;
   --surface: #ffffff;
-  --text: #1e293b;
-  --text-secondary: #64748b;
+  --text: #0f172b;
+  --text-secondary: #62748e;
   --border: #e2e8f0;
-  --code-bg: #f1f5f9;
-  --user-bg: #f1f5f9;
+  --border-strong: #cad5e2;
+  --code-bg: #e2e8f0;
+  --user-accent: #62748e;
+  --user-bg: #f8fafc;
+  --assistant-accent: #0f172b;
   --assistant-bg: #ffffff;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --badge-user-text: #ffffff;
+  --badge-assistant-text: #ffffff;
+  --shadow: 0 1px 2px rgba(15, 23, 43, 0.06), 0 4px 12px rgba(15, 23, 43, 0.04);
 }
 
 html.dark {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --text: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --border: #334155;
-  --code-bg: #0f172a;
-  --user-bg: #1e293b;
-  --assistant-bg: #1e293b;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --accent: #90a1b9;
+  --accent-dark: #cad5e2;
+  --accent-light: #e2e8f0;
+  --bg: #0f172b;
+  --surface: #1d293d;
+  --text: #f8fafc;
+  --text-secondary: #90a1b9;
+  --border: #314158;
+  --border-strong: #45556c;
+  --code-bg: #020618;
+  --user-accent: #90a1b9;
+  --user-bg: #314158;
+  --assistant-accent: #f1f5f9;
+  --assistant-bg: #1d293d;
+  --badge-user-text: #0f172b;
+  --badge-assistant-text: #0f172b;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -558,7 +608,7 @@ html {
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-body);
   line-height: 1.6;
   color: var(--text);
   background: var(--bg);
@@ -574,11 +624,12 @@ body {
 .site-header {
   position: sticky;
   top: 0;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--border-strong);
   padding: 1rem 0;
   z-index: 10;
-  box-shadow: var(--shadow);
 }
 
 .header-content {
@@ -590,8 +641,10 @@ body {
 
 .session-title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text);
 }
 
@@ -603,7 +656,7 @@ body {
 
 .theme-toggle {
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 9999px;
   width: 2.5rem;
   height: 2.5rem;
@@ -629,60 +682,63 @@ html.dark .theme-icon-light {
 }
 
 .chat {
-  padding-top: 1.5rem;
-  padding-bottom: 3rem;
+  padding-top: 2rem;
+  padding-bottom: 4rem;
 }
 
 .turn {
-  margin-bottom: 1.5rem;
+  margin-bottom: 2.5rem;
 }
 
 .turn-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
 }
 
 .turn-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--accent);
-  background: var(--bg);
-  padding: 0.2rem 0.5rem;
-  border-radius: 0.25rem;
-  border: 1px solid var(--border);
+  letter-spacing: 0.07em;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.4rem;
+  line-height: 1.4;
+}
+
+.user-badge {
+  color: var(--badge-user-text);
+  background: var(--user-accent);
 }
 
 .assistant-badge {
-  color: var(--surface);
-  background: var(--accent);
-  border-color: var(--accent);
+  color: var(--badge-assistant-text);
+  background: var(--assistant-accent);
 }
 
 .assistant-info {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
   color: var(--text-secondary);
 }
 
 .message {
-  padding: 1rem;
+  padding: 1.25rem 1.5rem;
   border-radius: 0.75rem;
   border: 1px solid var(--border);
-  box-shadow: var(--shadow);
   overflow-wrap: break-word;
 }
 
 .user-message {
   background: var(--user-bg);
-  margin-left: auto;
-  max-width: 85%;
+  border-color: color-mix(in srgb, var(--user-accent) 22%, var(--border));
+  border-left: 3px solid var(--user-accent);
 }
 
 .assistant-message {
   background: var(--assistant-bg);
+  box-shadow: var(--shadow);
 }
 
 .message > *:first-child {
@@ -695,7 +751,7 @@ html.dark .theme-icon-light {
 
 .collapsible {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 0.5rem;
   margin-bottom: 0.75rem;
   overflow: hidden;
@@ -746,8 +802,34 @@ html.dark .theme-icon-light {
   border-left: 3px solid var(--accent);
 }
 
+.synthetic {
+  border-left: 3px solid var(--user-accent);
+  margin-top: 0.75rem;
+}
+
+.synthetic-code {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  padding: 0.75rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  max-height: 40vh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-secondary);
+}
+
+.synthetic-code:last-child {
+  margin-bottom: 0;
+}
+
 .tool-name {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono);
   color: var(--text);
 }
 
@@ -766,6 +848,8 @@ html.dark .theme-icon-light {
 
 .tool-code {
   margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
   padding: 0.75rem;
   background: var(--code-bg);
   border: 1px solid var(--border);
@@ -803,20 +887,22 @@ html.dark .theme-icon-light {
 .message h4,
 .message h5,
 .message h6 {
-  margin: 1.25rem 0 0.75rem;
-  line-height: 1.3;
+  font-family: var(--font-heading);
+  margin: 1.5rem 0 0.75rem;
+  line-height: 1.2;
+  font-weight: 700;
   color: var(--text);
 }
 
 .message h1 {
-  font-size: 1.5rem;
-  border-bottom: 1px solid var(--border);
+  font-size: 1.6rem;
+  border-bottom: 2px solid var(--border-strong);
   padding-bottom: 0.5rem;
 }
 
 .message h2 {
-  font-size: 1.25rem;
-  border-bottom: 1px solid var(--border);
+  font-size: 1.3rem;
+  border-bottom: 1px solid var(--border-strong);
   padding-bottom: 0.4rem;
 }
 
@@ -830,11 +916,14 @@ html.dark .theme-icon-light {
 
 .message a {
   color: var(--accent-dark);
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  text-underline-offset: 2px;
+  font-weight: 500;
 }
 
 .message a:hover {
-  text-decoration: underline;
+  text-decoration-color: var(--accent);
 }
 
 .message ul,
@@ -865,7 +954,7 @@ html.dark .theme-icon-light {
 }
 
 .message pre code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   line-height: 1.5;
   background: transparent;
@@ -874,7 +963,7 @@ html.dark .theme-icon-light {
 }
 
 .message code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
   background: var(--code-bg);
   padding: 0.15rem 0.35rem;
@@ -938,11 +1027,11 @@ html.dark .theme-icon-light {
   }
 
   .message {
-    padding: 0.85rem;
+    padding: 1rem 1.1rem;
   }
 
-  .user-message {
-    max-width: 100%;
+  .turn {
+    margin-bottom: 2rem;
   }
 
   .turn-header {
