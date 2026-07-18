@@ -3,6 +3,7 @@ import { Database } from "bun:sqlite";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline/promises";
+import { sanitizePathForDisplay } from "./sanitize.ts";
 
 const DB_PATH = path.join(os.homedir(), ".local/share/opencode/opencode.db");
 const LIMIT = 20;
@@ -40,9 +41,9 @@ async function runExportToFile(id: string, jsonPath: string): Promise<void> {
   }
 }
 
-async function runRender(jsonPath: string): Promise<void> {
+async function runRender(jsonPath: string, sanitize: boolean): Promise<void> {
   const proc = Bun.spawn({
-    cmd: ["bun", "render.ts", jsonPath],
+    cmd: ["bun", "render.ts", ...(sanitize ? ["--sanitize"] : []), jsonPath],
     stdout: "inherit",
     stderr: "inherit",
   });
@@ -52,7 +53,7 @@ async function runRender(jsonPath: string): Promise<void> {
   }
 }
 
-async function pickInteractive(): Promise<void> {
+async function pickInteractive(sanitize: boolean): Promise<void> {
   const db = new Database(DB_PATH, { readonly: true, create: false });
   const rows = db
     .query(
@@ -74,7 +75,7 @@ async function pickInteractive(): Promise<void> {
     const row = rows[i]!;
     const idx = String(i + 1).padStart(2, " ");
     const date = formatDate(row.time_updated);
-    const dir = truncateDir(row.directory);
+    const dir = sanitize ? sanitizePathForDisplay(row.directory) : truncateDir(row.directory);
     console.log(`${idx}. [${last8(row.id)}] ${row.title}`);
     console.log(`    ${date} · ${dir}`);
   }
@@ -93,7 +94,7 @@ async function pickInteractive(): Promise<void> {
     process.exit(1);
   }
 
-  await exportAndRender(rows[num - 1]!.id);
+  await exportAndRender(rows[num - 1]!.id, sanitize);
 }
 
 async function findSessionByIdOrSuffix(idOrSuffix: string): Promise<SessionRow> {
@@ -138,28 +139,31 @@ async function findSessionByIdOrSuffix(idOrSuffix: string): Promise<SessionRow> 
   process.exit(1);
 }
 
-async function exportAndRender(id: string): Promise<void> {
+async function exportAndRender(id: string, sanitize: boolean): Promise<void> {
   const suffix = last8(id);
   const jsonName = `session-${suffix}.json`;
   const jsonPath = path.resolve(jsonName);
   const htmlName = `session-${suffix}.html`;
+  const displayJson = sanitize ? sanitizePathForDisplay(jsonPath) : jsonName;
 
-  console.log(`Exporting session ${id} → ${jsonName}`);
+  console.log(`Exporting session ${id} → ${displayJson}`);
   await runExportToFile(id, jsonPath);
 
   console.log(`Rendering → ${htmlName}`);
-  await runRender(jsonPath);
+  await runRender(jsonPath, sanitize);
 
-  console.log(`Done: ${jsonPath} → ${htmlName}`);
+  console.log(`Done: ${displayJson} → ${htmlName}`);
 }
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  if (args.length === 0) {
-    await pickInteractive();
+  const sanitize = args.includes("--sanitize");
+  const idArgs = args.filter((a) => a !== "--sanitize");
+  if (idArgs.length === 0) {
+    await pickInteractive(sanitize);
   } else {
-    const row = await findSessionByIdOrSuffix(args[0]!);
-    await exportAndRender(row.id);
+    const row = await findSessionByIdOrSuffix(idArgs[0]!);
+    await exportAndRender(row.id, sanitize);
   }
 }
 

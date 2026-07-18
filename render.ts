@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import MarkdownIt from "markdown-it";
+import { sanitizePathForDisplay, sanitizeText } from "./sanitize.ts";
 
 const md = new MarkdownIt({
   html: false,
@@ -163,6 +164,26 @@ function parseSession(text: string): { meta: SessionMeta; turns: Turn[] } {
 function formatTimestamp(ms: number | undefined): string | undefined {
   if (ms === undefined) return undefined;
   return new Date(ms).toLocaleString();
+}
+
+function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
+  meta.title = sanitizeText(meta.title);
+  meta.sessionId = meta.sessionId ? sanitizeText(meta.sessionId) : undefined;
+  meta.created = meta.created ? sanitizeText(meta.created) : undefined;
+  meta.updated = meta.updated ? sanitizeText(meta.updated) : undefined;
+
+  for (const turn of turns) {
+    turn.content = sanitizeText(turn.content);
+    turn.header = turn.header ? sanitizeText(turn.header) : undefined;
+    turn.thinking = turn.thinking.map(sanitizeText);
+    turn.synthetic = turn.synthetic.map(sanitizeText);
+
+    for (const tool of turn.tools) {
+      tool.name = sanitizeText(tool.name);
+      tool.input = sanitizeText(tool.input);
+      tool.output = sanitizeText(tool.output);
+    }
+  }
 }
 
 function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Turn[] } {
@@ -416,6 +437,26 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#039;");
 }
 
+function hashString(text: string): number {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash << 5) + hash + text.charCodeAt(i)!;
+  }
+  return Math.abs(hash);
+}
+
+function generateFavicon(title: string): string {
+  const initial = title.trim().slice(0, 1).toUpperCase() || "?";
+  const hue = hashString(title) % 360;
+  const background = `hsl(${hue} 70% 55%)`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="${background}"/><text x="50" y="68" font-size="55" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif" font-weight="700">${escapeHtml(initial)}</text></svg>`;
+  const encoded = encodeURIComponent(svg)
+    .replace(/'/g, "%27")
+    .replace(/\(/g, "%28")
+    .replace(/\)/g, "%29");
+  return `data:image/svg+xml,${encoded}`;
+}
+
 function buildPage(meta: SessionMeta, turns: Turn[]): string {
   const title = escapeHtml(meta.title);
   const subtitle = [meta.sessionId, meta.created, meta.updated]
@@ -437,6 +478,7 @@ function buildPage(meta: SessionMeta, turns: Turn[]): string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${title}</title>
+<link rel="icon" type="image/svg+xml" href="${generateFavicon(meta.title)}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=Geist+Mono:wght@400;500&family=League+Spartan:wght@600;700&display=swap">
@@ -1074,10 +1116,11 @@ function resolveOutputPath(inputPath: string): string {
   return path.join(path.dirname(inputPath), outputName);
 }
 
-function processFile(inputPath: string, format: SourceFormat): void {
+function processFile(inputPath: string, format: SourceFormat, sanitize: boolean): void {
   const resolved = path.resolve(inputPath);
   if (!fs.existsSync(resolved)) {
-    console.error(`File not found: ${resolved}`);
+    const display = sanitize ? sanitizePathForDisplay(resolved) : resolved;
+    console.error(`File not found: ${display}`);
     process.exit(1);
   }
 
@@ -1095,18 +1138,27 @@ function processFile(inputPath: string, format: SourceFormat): void {
     ({ meta, turns } = parseSession(text));
   }
 
+  if (sanitize) {
+    sanitizeSession(meta, turns);
+  }
+
   const html = buildPage(meta, turns);
   const outputPath = resolveOutputPath(resolved);
   fs.writeFileSync(outputPath, html, "utf-8");
 
-  console.log(`Rendered ${turns.length} turns from ${resolved} → ${outputPath}`);
+  const displayResolved = sanitize ? sanitizePathForDisplay(resolved) : resolved;
+  const displayOutput = sanitize ? sanitizePathForDisplay(outputPath) : outputPath;
+  console.log(`Rendered ${turns.length} turns from ${displayResolved} → ${displayOutput}`);
 }
 
 function main(): void {
-  const inputs = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const sanitize = args.includes("--sanitize");
+  const inputs = args.filter((a) => a !== "--sanitize");
+
   if (inputs.length === 0) {
     console.error(
-      "Usage: bun render.ts <session.json|session.md> [<session2.json|session2.md> ...]",
+      "Usage: bun render.ts [--sanitize] <session.json|session.md> [<session2.json|session2.md> ...]",
     );
     process.exit(1);
   }
@@ -1116,7 +1168,8 @@ function main(): void {
   for (const input of inputs) {
     const format = getSourceFormat(input);
     if (format === "unknown") {
-      console.error(`Unsupported file format: ${input}`);
+      const display = sanitize ? sanitizePathForDisplay(input) : input;
+      console.error(`Unsupported file format: ${display}`);
       process.exit(1);
     }
     const outputPath = resolveOutputPath(path.resolve(input));
@@ -1129,7 +1182,7 @@ function main(): void {
   }
 
   for (const { input, format } of outputToFormat.values()) {
-    processFile(input, format);
+    processFile(input, format, sanitize);
   }
 }
 

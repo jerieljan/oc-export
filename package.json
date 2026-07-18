@@ -16,6 +16,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@redactpii/node": "^1.0.17",
     "markdown-it": "^14.3.0"
   }
 }
