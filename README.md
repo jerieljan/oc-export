@@ -29,6 +29,14 @@ Alternatively, install globally from the local path:
 bun install -g /path/to/oc-export
 ```
 
+## Fish completions
+
+A Fish completions file is included in `completions/oc-export.fish`. Copy it to your Fish completions directory:
+
+```bash
+cp completions/oc-export.fish ~/.config/fish/completions/
+```
+
 ## Usage
 
 Run the interactive picker to choose a recent session:
