@@ -15,6 +15,23 @@ interface SessionMeta {
   sessionId?: string;
   created?: string;
   updated?: string;
+  stats?: SessionStats;
+}
+
+interface SessionStats {
+  createdMs?: number;
+  updatedMs?: number;
+  durationMs?: number;
+  cost?: number;
+  tokensInput?: number;
+  tokensOutput?: number;
+  tokensReasoning?: number;
+  tokensCacheRead?: number;
+  totalMessages?: number;
+  userMessages?: number;
+  assistantMessages?: number;
+  reasoningParts?: number;
+  toolParts?: number;
 }
 
 interface ToolCall {
@@ -46,6 +63,12 @@ interface JsonSessionInfo {
   version?: string;
   cost?: number;
   time?: { created?: number; updated?: number };
+  tokens?: {
+    input?: number;
+    output?: number;
+    reasoning?: number;
+    cache?: { read?: number; write?: number };
+  };
 }
 
 interface JsonMessage {
@@ -65,6 +88,12 @@ interface JsonMessageInfo {
   cost?: number;
   time?: { created?: number; completed?: number };
   finish?: string;
+  tokens?: {
+    input?: number;
+    output?: number;
+    reasoning?: number;
+    cache?: { read?: number; write?: number };
+  };
 }
 
 interface JsonPart {
@@ -95,6 +124,27 @@ function formatTimestamp(ms: number | undefined): string | undefined {
   return new Date(ms).toLocaleString();
 }
 
+function formatDuration(ms: number | undefined): string | undefined {
+  if (ms === undefined) return undefined;
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) {
+    return `${minutes} min ${seconds} sec`;
+  }
+  return `${seconds} sec`;
+}
+
+function formatCost(cost: number | undefined): string | undefined {
+  if (cost === undefined) return undefined;
+  return `$${cost.toFixed(5)}`;
+}
+
+function formatTokens(value: number | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return value.toLocaleString();
+}
+
 function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
   meta.title = sanitizeText(meta.title);
   meta.sessionId = meta.sessionId ? sanitizeText(meta.sessionId) : undefined;
@@ -115,6 +165,90 @@ function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
   }
 }
 
+function computeStats(session: JsonSession): SessionStats {
+  const info = session.info;
+  const createdMs = info.time?.created;
+  const updatedMs = info.time?.updated;
+  const durationMs =
+    createdMs !== undefined && updatedMs !== undefined
+      ? updatedMs - createdMs
+      : undefined;
+
+  let cost: number | undefined =
+    info.cost !== undefined ? info.cost : undefined;
+  if (cost === undefined) {
+    const sum = session.messages.reduce((acc, message) => {
+      return acc + (message.info.cost ?? 0);
+    }, 0);
+    cost = sum > 0 ? sum : undefined;
+  }
+
+  let tokensInput: number | undefined;
+  let tokensOutput: number | undefined;
+  let tokensReasoning: number | undefined;
+  let tokensCacheRead: number | undefined;
+
+  if (info.tokens) {
+    tokensInput = info.tokens.input;
+    tokensOutput = info.tokens.output;
+    tokensReasoning = info.tokens.reasoning;
+    tokensCacheRead = info.tokens.cache?.read;
+  } else {
+    let hasTokenData = false;
+    const totals = session.messages.reduce(
+      (acc, message) => {
+        const tokens = message.info.tokens;
+        if (tokens) {
+          hasTokenData = true;
+          acc.input += tokens.input ?? 0;
+          acc.output += tokens.output ?? 0;
+          acc.reasoning += tokens.reasoning ?? 0;
+          acc.cacheRead += tokens.cache?.read ?? 0;
+        }
+        return acc;
+      },
+      { input: 0, output: 0, reasoning: 0, cacheRead: 0 },
+    );
+    if (hasTokenData) {
+      tokensInput = totals.input;
+      tokensOutput = totals.output;
+      tokensReasoning = totals.reasoning;
+      tokensCacheRead = totals.cacheRead;
+    }
+  }
+
+  const totalMessages = session.messages.length;
+  const userMessages = session.messages.filter(
+    (message) => message.info.role === "user",
+  ).length;
+  const assistantMessages = totalMessages - userMessages;
+
+  let reasoningParts = 0;
+  let toolParts = 0;
+  for (const message of session.messages) {
+    for (const part of message.parts) {
+      if (part.type === "reasoning") reasoningParts++;
+      else if (part.type === "tool") toolParts++;
+    }
+  }
+
+  return {
+    createdMs,
+    updatedMs,
+    durationMs,
+    cost,
+    tokensInput,
+    tokensOutput,
+    tokensReasoning,
+    tokensCacheRead,
+    totalMessages,
+    userMessages,
+    assistantMessages,
+    reasoningParts,
+    toolParts,
+  };
+}
+
 function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Turn[] } {
   const info = session.info;
   const meta: SessionMeta = {
@@ -122,6 +256,7 @@ function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Tur
     sessionId: info.id,
     created: formatTimestamp(info.time?.created),
     updated: formatTimestamp(info.time?.updated),
+    stats: computeStats(session),
   };
 
   const turns: Turn[] = [];
@@ -268,9 +403,75 @@ function generateFavicon(title: string): string {
   return `data:image/svg+xml,${encoded}`;
 }
 
+function statPair(label: string, value: string | undefined): string {
+  const valueHtml =
+    value === undefined
+      ? `<dd class="stat-na">N/A</dd>`
+      : `<dd>${escapeHtml(value)}</dd>`;
+  return `<div class="stat-pair"><dt>${escapeHtml(label)}</dt>${valueHtml}</div>`;
+}
+
+function statBlank(): string {
+  return `<div class="stat-pair stat-blank"></div>`;
+}
+
+function statRow(items: string[]): string {
+  return `<div class="stats-row">\n    ${items.join("\n")}\n  </div>`;
+}
+
+function renderStats(stats: SessionStats | undefined): string {
+  if (!stats) return "";
+
+  const rows: string[] = [];
+
+  rows.push(
+    statRow([
+      statPair("Created", formatTimestamp(stats.createdMs)),
+      statPair("Updated", formatTimestamp(stats.updatedMs)),
+      statBlank(),
+    ]),
+  );
+
+  rows.push(
+    statRow([
+      statPair("Tokens input", formatTokens(stats.tokensInput)),
+      statPair("Tokens output", formatTokens(stats.tokensOutput)),
+      statPair("Cache read", formatTokens(stats.tokensCacheRead)),
+    ]),
+  );
+
+  rows.push(
+    statRow([
+      statPair("Tokens reasoning", formatTokens(stats.tokensReasoning)),
+      statPair("Reasoning parts", formatTokens(stats.reasoningParts)),
+      statPair("Tool-call parts", formatTokens(stats.toolParts)),
+    ]),
+  );
+
+  rows.push(
+    statRow([
+      statPair("User messages", formatTokens(stats.userMessages)),
+      statPair("Assistant messages", formatTokens(stats.assistantMessages)),
+      statPair("Total messages", formatTokens(stats.totalMessages)),
+    ]),
+  );
+
+  return `<section class="container session-stats">
+  <h2 class="session-stats-heading">Session statistics</h2>
+  <div class="stats-grid">
+    ${rows.join("\n")}
+  </div>
+</section>`;
+}
+
 function buildPage(meta: SessionMeta, turns: Turn[]): string {
   const title = escapeHtml(meta.title);
-  const subtitle = [meta.sessionId, meta.created, meta.updated]
+  const subtitle = [
+    meta.sessionId,
+    meta.created,
+    formatDuration(meta.stats?.durationMs),
+    formatCost(meta.stats?.cost),
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -282,6 +483,8 @@ function buildPage(meta: SessionMeta, turns: Turn[]): string {
       return renderAssistantTurn(turn, index);
     })
     .join("\n");
+
+  const statsHtml = renderStats(meta.stats);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -315,6 +518,7 @@ ${styles()}
 <main class="container chat">
 ${turnHtml}
 </main>
+${statsHtml}
 <script>
 ${scripts()}
 </script>
@@ -651,6 +855,66 @@ html.dark .theme-icon-light {
   font-size: 0.95rem;
 }
 
+.session-stats {
+  background: var(--bg);
+  border: 1px dashed var(--border-strong);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-top: 1rem;
+  margin-bottom: 4rem;
+}
+
+.session-stats-heading {
+  margin: 0 0 1rem;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stats-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem 1.5rem;
+}
+
+.stat-pair {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.stat-blank {
+  visibility: hidden;
+}
+
+.stat-pair dt {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.stat-pair dd {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.stat-na {
+  color: var(--text-secondary);
+  font-style: italic;
+  font-weight: 400;
+}
+
 .tool {
   border-left: 3px solid var(--accent);
 }
@@ -889,6 +1153,10 @@ html.dark .theme-icon-light {
 
   .turn-header {
     flex-wrap: wrap;
+  }
+
+  .stats-row {
+    grid-template-columns: 1fr;
   }
 }
 `;
