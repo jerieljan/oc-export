@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import fs from "node:fs";
 import path from "node:path";
 import MarkdownIt from "markdown-it";
@@ -86,79 +85,9 @@ interface JsonToolState {
   time?: { start?: number; end?: number };
 }
 
-function parseSession(text: string): { meta: SessionMeta; turns: Turn[] } {
-  const lines = text.split("\n");
-  let title = "Chat Session";
-  const meta: SessionMeta = { title };
-
-  // First pass: extract title and metadata from the top of the file.
-  let metaEnd = 0;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-    if (line.startsWith("# ")) {
-      title = line.slice(2).trim();
-      meta.title = title;
-      continue;
-    }
-    const sessionMatch = /^\*\*Session ID:\*\*\s*(.+)$/.exec(line);
-    if (sessionMatch) {
-      meta.sessionId = sessionMatch[1]!.trim();
-      continue;
-    }
-    const createdMatch = /^\*\*Created:\*\*\s*(.+)$/.exec(line);
-    if (createdMatch) {
-      meta.created = createdMatch[1]!.trim();
-      continue;
-    }
-    const updatedMatch = /^\*\*Updated:\*\*\s*(.+)$/.exec(line);
-    if (updatedMatch) {
-      meta.updated = updatedMatch[1]!.trim();
-      continue;
-    }
-    if (line.startsWith("---")) {
-      metaEnd = i;
-      break;
-    }
-  }
-
-  // Split the remainder into turns on standalone "---" lines.
-  const remainder = lines.slice(metaEnd).join("\n");
-  const turnBlocks = remainder
-    .split(/^---\s*$/gm)
-    .map((b) => b.trim())
-    .filter((b) => b.length > 0);
-
-  const turns: Turn[] = [];
-
-  for (const block of turnBlocks) {
-    const lines = block.split("\n");
-    const firstLine = lines[0]!;
-
-    if (firstLine.startsWith("## User")) {
-      const content = lines.slice(1).join("\n").trim();
-      turns.push({ role: "user", thinking: [], tools: [], content, synthetic: [] });
-      continue;
-    }
-
-    if (firstLine.startsWith("## Assistant")) {
-      const header = firstLine.slice(3).trim();
-      const body = lines.slice(1).join("\n");
-      turns.push(parseAssistantTurn(header, body));
-      continue;
-    }
-
-    // If the block doesn't start with a recognized header, treat it as an
-    // assistant content block. This handles stray content gracefully.
-    turns.push({
-      role: "assistant",
-      thinking: [],
-      tools: [],
-      content: block,
-      synthetic: [],
-    });
-  }
-
-  return { meta, turns };
+export interface RenderOptions {
+  sanitize?: boolean;
+  outputPath?: string;
 }
 
 function formatTimestamp(ms: number | undefined): string | undefined {
@@ -310,124 +239,6 @@ function parseJsonTool(toolName: string, state: JsonToolState): ToolCall {
   return { name: toolName, input, output };
 }
 
-function parseAssistantTurn(header: string, body: string): Turn {
-  const turn: Turn = {
-    role: "assistant",
-    header,
-    thinking: [],
-    tools: [],
-    content: "",
-    synthetic: [],
-  };
-
-  let remaining = body.trimStart();
-
-  // Extract thinking block if present. It starts with "_Thinking:_" and ends
-  // just before the first "**Tool:" marker.
-  if (remaining.startsWith("_Thinking:_")) {
-    const toolMarker = "**Tool:";
-    const toolIndex = remaining.indexOf(toolMarker);
-    if (toolIndex !== -1) {
-      const thinkingText = remaining
-        .slice(0, toolIndex)
-        .replace(/^_Thinking:_\s*/, "")
-        .trim();
-      if (thinkingText) turn.thinking.push(thinkingText);
-      remaining = remaining.slice(toolIndex);
-    } else {
-      // No tools: strip the marker and treat the rest as the answer.
-      remaining = remaining.replace(/^_Thinking:_\s*/, "");
-    }
-  }
-
-  // Extract tool blocks.
-  const toolBlocks = splitByToolMarkers(remaining);
-  if (toolBlocks.length === 0) {
-    turn.content = remaining.trim();
-    return turn;
-  }
-
-  let contentStart = remaining.length;
-  for (const block of toolBlocks) {
-    const tool = parseToolBlock(block.text);
-    if (tool) {
-      turn.tools.push(tool);
-      contentStart = block.start + block.consumedLength;
-    }
-  }
-
-  turn.content = remaining.slice(contentStart).trim();
-
-  return turn;
-}
-
-interface ToolBlock {
-  text: string;
-  start: number;
-  consumedLength: number;
-}
-
-function splitByToolMarkers(text: string): ToolBlock[] {
-  const marker = "**Tool:";
-  const positions: number[] = [];
-  let idx = 0;
-  while (true) {
-    const pos = text.indexOf(marker, idx);
-    if (pos === -1) break;
-    positions.push(pos);
-    idx = pos + marker.length;
-  }
-
-  const blocks: ToolBlock[] = [];
-  for (let i = 0; i < positions.length; i++) {
-    const start = positions[i]!;
-    const end = i + 1 < positions.length ? positions[i + 1]! : text.length;
-    blocks.push({
-      text: text.slice(start, end),
-      start,
-      consumedLength: end - start,
-    });
-  }
-  return blocks;
-}
-
-function parseToolBlock(text: string): ToolCall | null {
-  const nameMatch = /^\*\*Tool:\s*([^*]+)\*\*/.exec(text);
-  if (!nameMatch) return null;
-  const name = nameMatch[1]!.trim();
-
-  const inputLabel = "**Input:**";
-  const outputLabel = "**Output:**";
-  const inputIndex = text.indexOf(inputLabel);
-  const outputIndex = text.indexOf(outputLabel);
-  if (inputIndex === -1 || outputIndex === -1 || outputIndex <= inputIndex) {
-    return null;
-  }
-
-  const input = text
-    .slice(inputIndex + inputLabel.length, outputIndex)
-    .trim();
-  const outputRaw = text.slice(outputIndex + outputLabel.length);
-  const output = extractFencedContent(outputRaw).trim();
-
-  return { name, input, output };
-}
-
-function extractFencedContent(text: string): string {
-  const trimmed = text.trim();
-  if (trimmed.startsWith("```")) {
-    const firstNewline = trimmed.indexOf("\n");
-    if (firstNewline !== -1) {
-      const rest = trimmed.slice(firstNewline + 1);
-      const endFence = rest.lastIndexOf("```");
-      if (endFence !== -1) {
-        return rest.slice(0, endFence).trimEnd();
-      }
-    }
-  }
-  return trimmed;
-}
-
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -557,7 +368,7 @@ function renderAssistantTurn(turn: Turn, index: number): string {
 
   if (turn.tools.length > 0) {
     const toolsBody = turn.tools
-      .map((tool, tidx) => {
+      .map((tool) => {
         return `
 <details class="collapsible tool">
   <summary><span class="tool-name">${escapeHtml(tool.name)}</span></summary>
@@ -1101,89 +912,48 @@ function scripts(): string {
 `;
 }
 
-type SourceFormat = "json" | "markdown" | "unknown";
-
-function getSourceFormat(inputPath: string): SourceFormat {
-  const ext = path.extname(inputPath).toLowerCase();
-  if (ext === ".json") return "json";
-  if (ext === ".md" || ext === ".markdown") return "markdown";
-  return "unknown";
-}
-
 function resolveOutputPath(inputPath: string): string {
   const ext = path.extname(inputPath);
   const outputName = path.basename(inputPath, ext) + ".html";
   return path.join(path.dirname(inputPath), outputName);
 }
 
-function processFile(inputPath: string, format: SourceFormat, sanitize: boolean): void {
+export function renderFile(inputPath: string, options: RenderOptions = {}): string {
+  const { sanitize = true } = options;
   const resolved = path.resolve(inputPath);
   if (!fs.existsSync(resolved)) {
     const display = sanitize ? sanitizePathForDisplay(resolved) : resolved;
-    console.error(`File not found: ${display}`);
-    process.exit(1);
+    throw new Error(`File not found: ${display}`);
   }
 
   const text = fs.readFileSync(resolved, "utf-8");
-  let meta: SessionMeta;
-  let turns: Turn[];
-
-  if (format === "json") {
-    const session = JSON.parse(text) as JsonSession;
-    ({ meta, turns } = parseJsonSession(session));
-  } else {
-    console.log(
-      `warning: Markdown export format is fragile (tool blocks can break on headings or images). Use the JSON export format for reliable rendering.`,
-    );
-    ({ meta, turns } = parseSession(text));
-  }
+  const session = JSON.parse(text) as JsonSession;
+  let { meta, turns } = parseJsonSession(session);
 
   if (sanitize) {
     sanitizeSession(meta, turns);
   }
 
   const html = buildPage(meta, turns);
-  const outputPath = resolveOutputPath(resolved);
+  const outputPath = options.outputPath
+    ? path.resolve(options.outputPath)
+    : resolveOutputPath(resolved);
+
+  const outputDir = path.dirname(outputPath);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
   fs.writeFileSync(outputPath, html, "utf-8");
 
   const displayResolved = sanitize ? sanitizePathForDisplay(resolved) : resolved;
   const displayOutput = sanitize ? sanitizePathForDisplay(outputPath) : outputPath;
   console.log(`Rendered ${turns.length} turns from ${displayResolved} → ${displayOutput}`);
+  return outputPath;
 }
 
-function main(): void {
-  const args = process.argv.slice(2);
-  const sanitize = args.includes("--sanitize");
-  const inputs = args.filter((a) => a !== "--sanitize");
-
-  if (inputs.length === 0) {
-    console.error(
-      "Usage: bun render.ts [--sanitize] <session.json|session.md> [<session2.json|session2.md> ...]",
-    );
-    process.exit(1);
-  }
-
-  // JSON inputs win silently over Markdown inputs that target the same output.
-  const outputToFormat = new Map<string, { input: string; format: SourceFormat }>();
-  for (const input of inputs) {
-    const format = getSourceFormat(input);
-    if (format === "unknown") {
-      const display = sanitize ? sanitizePathForDisplay(input) : input;
-      console.error(`Unsupported file format: ${display}`);
-      process.exit(1);
-    }
-    const outputPath = resolveOutputPath(path.resolve(input));
-    const existing = outputToFormat.get(outputPath);
-    if (existing && existing.format === "json") {
-      // JSON already owns this output; ignore the Markdown input.
-      continue;
-    }
-    outputToFormat.set(outputPath, { input, format });
-  }
-
-  for (const { input, format } of outputToFormat.values()) {
-    processFile(input, format, sanitize);
+export function renderFiles(inputPaths: string[], options: RenderOptions = {}): void {
+  for (const inputPath of inputPaths) {
+    renderFile(inputPath, options);
   }
 }
-
-main();

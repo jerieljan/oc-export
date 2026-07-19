@@ -1,12 +1,12 @@
-# opencode-chat-render
+# oc-export
 
-Date Created: 2026-07-16 15:23
+Export and render Opencode chat sessions to standalone HTML files.
 
 ## Description
 
-A renderer for exported Opencode chat discussions. It takes one or more session markdown files and produces a single, standalone HTML file for each session.
+`oc-export` is a CLI tool that turns Opencode chat sessions into self-contained HTML files. It can read existing JSON exports, export sessions directly from the local Opencode database, or present an interactive picker.
 
-## Usage
+## Installation
 
 Install dependencies with Bun:
 
@@ -14,34 +14,89 @@ Install dependencies with Bun:
 bun install
 ```
 
-Render a single session:
+To make `oc-export` available globally while keeping the TypeScript source editable:
 
 ```bash
-bun render.ts session-ses_0963.md
+bun link
+# Then in any directory:
+bun link oc-export
+oc-export --help
 ```
 
-Render multiple sessions:
+Alternatively, install globally from the local path:
 
 ```bash
-bun render.ts sessions/*.md
+bun install -g /path/to/oc-export
 ```
 
-Render with sanitization (redacts names, emails, phones, credit cards, SSNs, and converts absolute file paths to relative paths):
+## Usage
+
+Run the interactive picker to choose a recent session:
 
 ```bash
-bun render.ts --sanitize session-ses_0963.md
+oc-export
 ```
 
-Pick and render with sanitization:
+Pick a session and write both files with custom names:
 
 ```bash
-bun pick.ts --sanitize
+oc-export --output report
+# Produces: report.json, report.html
 ```
 
-Each input `session-*.md` produces a matching `session-*.html` in the same directory. The generated HTML is fully self-contained: all CSS and JavaScript are embedded inline, so no external network requests are required to view it.
+Render an existing JSON export:
 
-### Sanitization notes
+```bash
+oc-export session.json
+```
 
-- The `--sanitize` flag redacts common PII using `@redactpii/node` and replaces absolute paths with relative paths (based on the current working directory) or `~` references.
+Render with a custom output filename:
+
+```bash
+oc-export session.json --output report
+# Produces: report.html
+```
+
+Render multiple JSON exports:
+
+```bash
+oc-export a.json b.json
+```
+
+Export a session by full ID or last 8 characters:
+
+```bash
+oc-export --session abc123
+oc-export --session abc123 --output report
+# Produces: report.json, report.html
+```
+
+Skip sanitization with `--raw`:
+
+```bash
+oc-export session.json --raw
+oc-export --session abc123 --raw
+```
+
+Run during development:
+
+```bash
+bun run dev
+bun run dev --session abc123
+```
+
+## Sanitization
+
+Sanitization is enabled by default. It redacts common PII (names, emails, phones, credit cards, SSNs) using `@redactpii/node` and replaces absolute file paths with relative paths or `~` references. Use `--raw` to disable it.
+
 - Name detection is regex/greeting-based, so not every name will be caught.
 - Paths with spaces or inside URLs are handled conservatively; local `file://` paths are still sanitized.
+
+## Requirements
+
+- Bun
+- The `opencode` CLI must be installed and on PATH for `--session` and interactive picker modes.
+
+## Generated output
+
+Each HTML file is fully self-contained: all CSS and JavaScript are embedded inline, so no external network requests are required to view it.

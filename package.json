@@ -1,12 +1,14 @@
 {
-  "name": "opencode-chat-render",
-  "module": "render.ts",
-  "scripts": {
-    "render": "bun render.ts",
-    "pick": "bun pick.ts"
-  },
+  "name": "oc-export",
+  "module": "oc-export.ts",
   "type": "module",
   "private": true,
+  "bin": {
+    "oc-export": "./oc-export.ts"
+  },
+  "scripts": {
+    "dev": "bun oc-export.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/markdown-it": "^14.1.2",
