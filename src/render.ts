@@ -11,7 +11,7 @@ import {
   formatTimestampIsoWithTimezone,
   formatTokens,
 } from "./format.ts";
-import type { SessionMeta, SessionStats, Turn } from "./types.ts";
+import type { Reference, SessionMeta, SessionStats, Turn } from "./types.ts";
 
 const md = new MarkdownIt({
   html: false,
@@ -48,6 +48,14 @@ function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
       tool.name = sanitizeText(tool.name);
       tool.input = sanitizeText(tool.input);
       tool.output = sanitizeText(tool.output);
+    }
+
+    if (turn.references) {
+      for (const ref of turn.references) {
+        ref.title = sanitizeText(ref.title);
+        ref.domain = ref.domain ? sanitizeText(ref.domain) : undefined;
+        ref.snippet = ref.snippet ? sanitizeText(ref.snippet) : undefined;
+      }
     }
   }
 }
@@ -258,6 +266,70 @@ function renderUserTurn(turn: Turn, index: number): string {
 </article>`;
 }
 
+function dedupeReferences(refs: Reference[]): {
+  byUrl: Map<string, Reference>;
+  indexToCanonical: Map<number, Reference>;
+} {
+  const sorted = [...refs].sort((a, b) => a.index - b.index);
+  const byUrl = new Map<string, Reference>();
+  for (const ref of sorted) {
+    if (!byUrl.has(ref.url)) {
+      byUrl.set(ref.url, ref);
+    }
+  }
+  const indexToCanonical = new Map<number, Reference>();
+  for (const ref of refs) {
+    indexToCanonical.set(ref.index, byUrl.get(ref.url)!);
+  }
+  return { byUrl, indexToCanonical };
+}
+
+function renderContentWithReferences(
+  content: string,
+  turnIndex: number,
+  refs: Reference[],
+): string {
+  const { indexToCanonical } = dedupeReferences(refs);
+  let html = md.render(content);
+  html = html.replace(/【(\d+)】/g, (_, numStr) => {
+    const num = parseInt(numStr, 10);
+    const canonical = indexToCanonical.get(num);
+    if (!canonical) return "";
+    return `<sup class="ref"><a href="#turn-${turnIndex}-ref-${canonical.index}">${num}</a></sup>`;
+  });
+  return html;
+}
+
+function renderTurnReferences(refs: Reference[], turnIndex: number): string {
+  if (refs.length === 0) return "";
+  const { byUrl } = dedupeReferences(refs);
+  const canonicalRefs = [...byUrl.values()].sort((a, b) => a.index - b.index);
+
+  const items = canonicalRefs
+    .map((ref) => {
+      const domain = ref.domain
+        ? ` <span class="ref-domain">${escapeHtml(ref.domain)}</span>`
+        : "";
+      const snippet = ref.snippet
+        ? `<p class="ref-snippet">${escapeHtml(ref.snippet)}</p>`
+        : "";
+      return `
+      <li id="turn-${turnIndex}-ref-${ref.index}">
+        <a href="${escapeHtml(ref.url)}" target="_blank" rel="noopener">${ref.index}. ${escapeHtml(ref.title)}</a>${domain}
+        ${snippet}
+      </li>`;
+    })
+    .join("\n");
+
+  return `
+<details class="collapsible references">
+  <summary>References (${canonicalRefs.length})</summary>
+  <ol class="references-list">
+    ${items}
+  </ol>
+</details>`;
+}
+
 function renderAssistantTurn(turn: Turn, index: number): string {
   const parts: string[] = [];
 
@@ -300,9 +372,18 @@ function renderAssistantTurn(turn: Turn, index: number): string {
 </details>`);
   }
 
-  const content = turn.content ? md.render(turn.content) : "";
+  const hasReferences = turn.references && turn.references.length > 0;
+  const content = turn.content
+    ? hasReferences
+      ? renderContentWithReferences(turn.content, index, turn.references!)
+      : md.render(turn.content)
+    : "";
   const messageBlock = content
     ? `<div class="message assistant-message">\n    ${content}\n  </div>`
+    : "";
+
+  const referencesBlock = hasReferences
+    ? renderTurnReferences(turn.references!, index)
     : "";
 
   return `
@@ -313,6 +394,7 @@ function renderAssistantTurn(turn: Turn, index: number): string {
   </div>
   ${parts.join("\n")}
   ${messageBlock}
+  ${referencesBlock}
 </article>`;
 }
 
@@ -639,6 +721,53 @@ html.dark .theme-icon-light {
 
 .tool {
   border-left: 3px solid var(--accent);
+}
+
+.references {
+  border-left: 3px solid var(--accent-light);
+  margin-top: 0.75rem;
+}
+
+.references-list {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+  font-size: 0.9rem;
+}
+
+.references-list li {
+  margin: 0.5rem 0;
+  color: var(--text);
+}
+
+.ref {
+  font-size: 0.75em;
+  line-height: 0;
+  vertical-align: super;
+}
+
+.ref a {
+  color: var(--accent-dark);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.ref a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+
+.ref-domain {
+  color: var(--text-secondary);
+  font-size: 0.8em;
+  font-family: var(--font-mono);
+}
+
+.ref-snippet {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.85em;
+  line-height: 1.5;
 }
 
 .synthetic {

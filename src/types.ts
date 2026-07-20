@@ -30,11 +30,22 @@ export interface ToolCall {
   output: string;
 }
 
+export interface Reference {
+  index: number;
+  url: string;
+  title: string;
+  domain?: string;
+  snippet?: string;
+  isSearchResult?: boolean;
+  percentage?: number;
+}
+
 export interface Turn {
   role: "user" | "assistant";
   header?: string;
   thinking: string[];
   tools: ToolCall[];
+  references?: Reference[];
   content: string;
   synthetic: string[];
   thinkingSummary?: string;

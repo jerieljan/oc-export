@@ -1,5 +1,5 @@
 import type { Extractor } from "./types.ts";
-import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.ts";
+import type { Reference, SessionMeta, SessionStats, Turn } from "../types.ts";
 import { formatTimestamp, parseTimestamp } from "../format.ts";
 
 // JSON export format produced by Kagi Assistant.
@@ -67,25 +67,16 @@ function extractThinking(content: string): { content: string; thinking: string[]
   return { content: cleaned, thinking };
 }
 
-function formatReferenceOutput(ref: KagiReference): string {
-  const lines: string[] = [];
-  lines.push(`**[${ref.index}] ${ref.title}**`);
-  lines.push(`URL: ${ref.url}`);
-  lines.push(`Domain: ${ref.domain}`);
-  lines.push(`Source: ${ref.source}`);
-  lines.push(`Relevance: ${ref.percentage}%`);
-  lines.push(`Search result: ${ref.is_search_result ? "yes" : "no"}`);
-  lines.push("");
-  lines.push(ref.snippet);
-  return lines.join("\n");
-}
-
-function parseReferences(refs: KagiReference[] | undefined): ToolCall[] {
+function parseReferences(refs: KagiReference[] | undefined): Reference[] {
   if (!refs) return [];
   return refs.map((ref) => ({
-    name: "kagi_reference",
-    input: "",
-    output: formatReferenceOutput(ref),
+    index: ref.index,
+    url: ref.url,
+    title: ref.title,
+    domain: ref.domain,
+    snippet: ref.snippet,
+    isSearchResult: ref.is_search_result,
+    percentage: ref.percentage,
   }));
 }
 
@@ -142,8 +133,7 @@ function parseKagiSession(session: KagiSession): { meta: SessionMeta; turns: Tur
     const { content, thinking } = extractThinking(message.content);
     if (thinking.length > 0) reasoningParts++;
 
-    const tools = parseReferences(message.references);
-    toolParts += tools.length;
+    const references = parseReferences(message.references);
 
     totalCost += message.cost_usd ?? 0;
     totalTokens += message.tokens ?? 0;
@@ -152,7 +142,8 @@ function parseKagiSession(session: KagiSession): { meta: SessionMeta; turns: Tur
       role: "assistant",
       header: buildAssistantHeader(message),
       thinking,
-      tools,
+      tools: [],
+      references,
       content,
       synthetic: [],
     });
