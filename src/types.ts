@@ -37,4 +37,6 @@ export interface Turn {
   tools: ToolCall[];
   content: string;
   synthetic: string[];
+  thinkingSummary?: string;
+  toolsSummary?: string;
 }

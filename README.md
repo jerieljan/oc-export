@@ -96,6 +96,13 @@ oc-export session.json --raw
 oc-export --session abc123 --raw
 ```
 
+Summarize thinking and tool-call blocks with `--summarize`:
+
+```bash
+oc-export session.json --summarize
+oc-export --session abc123 --summarize
+```
+
 Run during development:
 
 ```bash
@@ -150,6 +157,35 @@ oc-export --config ~/.oc-export.jsonc session.json
 | `raw` | boolean | `false` | Skip sanitization by default |
 | `picker.databasePath` | string | `~/.local/share/opencode/opencode.db` | Path to the Opencode SQLite database |
 | `picker.limit` | number | `20` | Number of recent sessions shown in the interactive picker |
+| `summarize.enabled` | boolean | `false` | Master switch for the summarize feature |
+| `summarize.model` | string | — | Model ID passed to `llm -m`; required when summarizing |
+| `summarize.always` | boolean | `false` | Run summarization by default without `--summarize` |
+| `summarize.prompt` | string | — | Custom system prompt for summarization |
+
+## Summarization
+
+When summarization is enabled, `oc-export` replaces collapsible thinking and tool-call blocks in assistant turns with concise summaries. This produces a shorter HTML file that is easier to skim.
+
+Summarization relies on Simon Willison's [`llm`](https://llm.datasette.io/) CLI. You must have it installed and on PATH, and you must configure a model ID in `~/.config/oc-export/config.jsonc`:
+
+```jsonc
+{
+  "summarize": {
+    "enabled": true,
+    "model": "gpt-4o-mini"
+  }
+}
+```
+
+With that config in place, run:
+
+```bash
+oc-export session.json --summarize
+```
+
+Set `summarize.always` to `true` to summarize by default without passing `--summarize`.
+
+Sanitization runs before summarization, so the model only sees redacted content. The model ID cannot be supplied via the CLI.
 
 ## Sanitization
 
@@ -162,6 +198,7 @@ Sanitization is enabled by default. It redacts common PII (names, emails, phones
 
 - Bun
 - The `opencode` CLI must be installed and on PATH for `--session` and interactive picker modes.
+- The `llm` CLI must be installed and on PATH to use `--summarize`.
 
 ## Generated output
 

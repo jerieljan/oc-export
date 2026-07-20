@@ -13,14 +13,23 @@ export interface PickerConfig {
   limit: number;
 }
 
+export interface SummarizeConfig {
+  enabled: boolean;
+  model?: string;
+  always?: boolean;
+  prompt?: string;
+}
+
 export interface UserConfig {
   raw?: boolean;
   picker?: Partial<PickerConfig>;
+  summarize?: SummarizeConfig;
 }
 
 export interface ResolvedConfig {
   raw: boolean;
   picker: PickerConfig;
+  summarize?: SummarizeConfig;
 }
 
 export const DEFAULT_PICKER_CONFIG: PickerConfig = {
@@ -80,6 +89,17 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
   validateString(config.picker?.databasePath, "picker.databasePath");
   validatePositiveNumber(config.picker?.limit, "picker.limit");
 
+  if (config.summarize !== undefined && typeof config.summarize !== "object") {
+    throw new Error('Config error: "summarize" must be an object');
+  }
+
+  if (config.summarize) {
+    validateBoolean(config.summarize.enabled, "summarize.enabled");
+    validateBoolean(config.summarize.always, "summarize.always");
+    validateString(config.summarize.model, "summarize.model");
+    validateString(config.summarize.prompt, "summarize.prompt");
+  }
+
   return {
     raw: config.raw ?? DEFAULT_CONFIG.raw,
     picker: {
@@ -88,6 +108,7 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
         : DEFAULT_PICKER_CONFIG.databasePath,
       limit: config.picker?.limit ?? DEFAULT_PICKER_CONFIG.limit,
     },
+    summarize: config.summarize,
   };
 }
 

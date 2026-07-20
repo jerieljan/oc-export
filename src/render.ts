@@ -3,6 +3,7 @@ import path from "node:path";
 import MarkdownIt from "markdown-it";
 import { sanitizePathForDisplay, sanitizeText } from "./sanitize.ts";
 import { extractSession } from "./extractors/index.ts";
+import { summarizeTurns, type SummarizeOptions } from "./summarize.ts";
 import {
   formatCost,
   formatDuration,
@@ -21,6 +22,7 @@ const md = new MarkdownIt({
 export interface RenderOptions {
   sanitize?: boolean;
   outputPath?: string;
+  summarize?: SummarizeOptions;
 }
 
 function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
@@ -34,6 +36,12 @@ function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
     turn.header = turn.header ? sanitizeText(turn.header) : undefined;
     turn.thinking = turn.thinking.map(sanitizeText);
     turn.synthetic = turn.synthetic.map(sanitizeText);
+    turn.thinkingSummary = turn.thinkingSummary
+      ? sanitizeText(turn.thinkingSummary)
+      : undefined;
+    turn.toolsSummary = turn.toolsSummary
+      ? sanitizeText(turn.toolsSummary)
+      : undefined;
 
     for (const tool of turn.tools) {
       tool.name = sanitizeText(tool.name);
@@ -229,9 +237,11 @@ function renderAssistantTurn(turn: Turn, index: number): string {
   const parts: string[] = [];
 
   if (turn.thinking.length > 0) {
-    const thinkingBody = turn.thinking
-      .map((t) => `<div class="thinking-block">${md.render(t)}</div>`)
-      .join("\n");
+    const thinkingBody = turn.thinkingSummary
+      ? `<div class="thinking-block">${md.render(turn.thinkingSummary)}</div>`
+      : turn.thinking
+          .map((t) => `<div class="thinking-block">${md.render(t)}</div>`)
+          .join("\n");
     parts.push(`
 <details class="collapsible thinking">
   <summary>Thinking (${turn.thinking.length})</summary>
@@ -240,9 +250,11 @@ function renderAssistantTurn(turn: Turn, index: number): string {
   }
 
   if (turn.tools.length > 0) {
-    const toolsBody = turn.tools
-      .map((tool) => {
-        return `
+    const toolsBody = turn.toolsSummary
+      ? `<div class="thinking-block">${md.render(turn.toolsSummary)}</div>`
+      : turn.tools
+          .map((tool) => {
+            return `
 <details class="collapsible tool">
   <summary><span class="tool-name">${escapeHtml(tool.name)}</span></summary>
   <div class="tool-section">
@@ -254,8 +266,8 @@ function renderAssistantTurn(turn: Turn, index: number): string {
     <div class="tool-output">${md.render(tool.output)}</div>
   </div>
 </details>`;
-      })
-      .join("\n");
+          })
+          .join("\n");
     parts.push(`
 <details class="collapsible tools">
   <summary>Tool calls (${turn.tools.length})</summary>
@@ -855,8 +867,11 @@ function resolveOutputPath(inputPath: string): string {
   return path.join(path.dirname(inputPath), outputName);
 }
 
-export function renderFile(inputPath: string, options: RenderOptions = {}): string {
-  const { sanitize = true } = options;
+export async function renderFile(
+  inputPath: string,
+  options: RenderOptions = {},
+): Promise<string> {
+  const { sanitize = true, summarize } = options;
   const resolved = path.resolve(inputPath);
   if (!fs.existsSync(resolved)) {
     const display = sanitize ? sanitizePathForDisplay(resolved) : resolved;
@@ -869,6 +884,31 @@ export function renderFile(inputPath: string, options: RenderOptions = {}): stri
 
   if (sanitize) {
     sanitizeSession(meta, turns);
+  }
+
+  if (summarize) {
+    const blockCount = turns.reduce((acc, turn) => {
+      if (turn.role !== "assistant") return acc;
+      return (
+        acc +
+        (turn.thinking.length > 0 ? 1 : 0) +
+        (turn.tools.length > 0 ? 1 : 0)
+      );
+    }, 0);
+    if (blockCount > 0) {
+      console.log(`Summarizing ${blockCount} block(s) with llm...`);
+      await summarizeTurns(turns, summarize);
+      if (sanitize) {
+        for (const turn of turns) {
+          if (turn.thinkingSummary) {
+            turn.thinkingSummary = sanitizeText(turn.thinkingSummary);
+          }
+          if (turn.toolsSummary) {
+            turn.toolsSummary = sanitizeText(turn.toolsSummary);
+          }
+        }
+      }
+    }
   }
 
   const html = buildPage(meta, turns);
@@ -889,8 +929,11 @@ export function renderFile(inputPath: string, options: RenderOptions = {}): stri
   return outputPath;
 }
 
-export function renderFiles(inputPaths: string[], options: RenderOptions = {}): void {
+export async function renderFiles(
+  inputPaths: string[],
+  options: RenderOptions = {},
+): Promise<void> {
   for (const inputPath of inputPaths) {
-    renderFile(inputPath, options);
+    await renderFile(inputPath, options);
   }
 }

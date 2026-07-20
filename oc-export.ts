@@ -14,6 +14,7 @@ Options:
   --output <name>  Rename both output files to <name>.json and <name>.html
   --raw            Skip sanitization
   --no-raw         Enable sanitization (default, overrides raw: true in config)
+  --summarize      Summarize thinking and tool-call blocks using llm
   --config <path>  Use a custom config file (default: ${DEFAULT_CONFIG_PATH})
   --help, -h       Show this help message
 
@@ -38,6 +39,7 @@ interface ParsedArgs {
   config?: string;
   session?: string;
   output?: string;
+  summarize?: boolean;
   files: string[];
 }
 
@@ -47,6 +49,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let config: string | undefined;
   let session: string | undefined;
   let output: string | undefined;
+  let summarize: boolean | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -57,6 +60,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       raw = true;
     } else if (arg === "--no-raw") {
       raw = false;
+    } else if (arg === "--summarize") {
+      summarize = true;
     } else if (arg === "--config") {
       const next = argv[++i];
       if (!next) {
@@ -86,7 +91,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     }
   }
 
-  return { raw, config, session, output, files };
+  return { raw, config, session, output, summarize, files };
 }
 
 function htmlOutputPath(outputArg: string): string {
@@ -101,6 +106,36 @@ async function main(): Promise<void> {
   const config = loadConfig(args.config);
   const sanitize = !(args.raw ?? config.raw);
 
+  const summarizeEnabled = config.summarize?.enabled === true;
+  const summarizeAlways = summarizeEnabled && config.summarize?.always === true;
+  const summarizeRequested = args.summarize === true;
+  const doSummarize = summarizeEnabled && (summarizeRequested || summarizeAlways);
+
+  if (summarizeRequested && !summarizeEnabled) {
+    console.error(
+      "Error: --summarize requires summarize.enabled to be true in config",
+    );
+    process.exit(1);
+  }
+
+  if (doSummarize) {
+    if (!config.summarize?.model) {
+      console.error("Error: Summarization requires summarize.model in config");
+      process.exit(1);
+    }
+    if (!Bun.which("llm")) {
+      console.error(
+        "Error: Summarization requires the `llm` CLI to be installed and on PATH. " +
+          "Install it (https://llm.datasette.io/) or omit --summarize.",
+      );
+      process.exit(1);
+    }
+  }
+
+  const summarizeOptions = doSummarize
+    ? { model: config.summarize!.model!, prompt: config.summarize!.prompt }
+    : undefined;
+
   if (args.session && args.files.length > 0) {
     console.error("Error: --session cannot be combined with input files");
     process.exit(1);
@@ -114,22 +149,36 @@ async function main(): Promise<void> {
   }
 
   if (args.session) {
-    await pickSessionById(args.session, { sanitize, outputBase: args.output, config });
+    await pickSessionById(args.session, {
+      sanitize,
+      outputBase: args.output,
+      config,
+      summarize: summarizeOptions,
+    });
     return;
   }
 
   if (args.files.length === 0) {
-    await pickInteractive({ sanitize, outputBase: args.output, config });
+    await pickInteractive({
+      sanitize,
+      outputBase: args.output,
+      config,
+      summarize: summarizeOptions,
+    });
     return;
   }
 
   if (args.files.length === 1) {
     const outputPath = args.output ? htmlOutputPath(args.output) : undefined;
-    await renderFile(args.files[0]!, { sanitize, outputPath });
+    await renderFile(args.files[0]!, {
+      sanitize,
+      outputPath,
+      summarize: summarizeOptions,
+    });
     return;
   }
 
-  await renderFiles(args.files, { sanitize });
+  await renderFiles(args.files, { sanitize, summarize: summarizeOptions });
 }
 
 main().catch((err) => {

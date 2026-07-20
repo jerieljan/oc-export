@@ -5,11 +5,13 @@ import readline from "node:readline/promises";
 import { DEFAULT_CONFIG, type ResolvedConfig } from "./config.ts";
 import { sanitizePathForDisplay } from "./sanitize.ts";
 import { renderFile } from "./render.ts";
+import type { SummarizeOptions } from "./summarize.ts";
 
 export interface PickOptions {
   sanitize?: boolean;
   outputBase?: string;
   config?: ResolvedConfig;
+  summarize?: SummarizeOptions;
 }
 
 interface SessionRow {
@@ -118,7 +120,7 @@ export async function exportAndRenderSession(
   id: string,
   options: PickOptions = {},
 ): Promise<void> {
-  const { sanitize = true, config = DEFAULT_CONFIG } = options;
+  const { sanitize = true, config = DEFAULT_CONFIG, summarize } = options;
   const { jsonPath, htmlPath } = resolveSessionOutputPaths(id, options.outputBase);
 
   const displayJson = sanitize ? sanitizePathForDisplay(jsonPath) : path.basename(jsonPath);
@@ -128,7 +130,7 @@ export async function exportAndRenderSession(
   await runExportToFile(id, jsonPath);
 
   console.log(`Rendering → ${displayHtml}`);
-  await renderFile(jsonPath, { sanitize, outputPath: htmlPath });
+  await renderFile(jsonPath, { sanitize, outputPath: htmlPath, summarize });
 
   console.log(`Done: ${displayJson} → ${displayHtml}`);
 }
