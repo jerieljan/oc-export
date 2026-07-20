@@ -34,7 +34,13 @@
     // When true, summarization runs by default without passing --summarize.
     "always": false,
 
-    // Optional custom prompt. If omitted, a default prompt is used.
+    // Optional custom prompt. If omitted, type-specific defaults are used.
     // "prompt": "..."
+
+    // Optional custom prompt for thinking summaries. Takes precedence over prompt.
+    // "thinkingPrompt": "..."
+
+    // Optional custom prompt for tool-call summaries. Takes precedence over prompt.
+    // "toolsPrompt": "..."
   }
 }

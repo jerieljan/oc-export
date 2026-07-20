@@ -2,18 +2,46 @@ import type { ToolCall, Turn } from "./types.ts";
 
 export interface SummarizeOptions {
   model: string;
+  /** Fallback or override for both thinking and tool summaries. */
   prompt?: string;
+  /** Override for thinking summaries. */
+  thinkingPrompt?: string;
+  /** Override for tool-call summaries. */
+  toolsPrompt?: string;
 }
 
-export const DEFAULT_SUMMARIZE_PROMPT = `You are provided the thinking or tool call history expressed by an AI agent.
+export const DEFAULT_THINKING_SUMMARY_PROMPT = `You are summarizing an AI assistant's internal thinking trace.
 
-Your task is to provide a concise summary of it, to illustrate what happened in that section of work performed by the AI agent.
+Summarize the trace in 1-2 short paragraphs of plain prose. Explain what problem the assistant was working through, what decisions it made, and what conclusion it reached.
 
-Thinking sessions depict the AI agent's thoughts and understanding, and are best summarized in 1-2 paragraphs, shorter than the original.
+Rules:
+- Output plain paragraphs only.
+- Do NOT use headings, lists, tables, code blocks, bold labels, or any structured formatting.
+- Do NOT quote raw tool output, commands, or file contents.
+- Keep it shorter than the original trace.
 
-Tool calls represent execution, which may or may not include the user's response followed by a series of actions performed by the AI agent.
+Example:
+The assistant analyzed the user's request to refactor the authentication module. It decided to extract the token validation logic into a shared helper and update the unit tests to cover the new edge cases before changing the API surface.`;
 
-For series of tool calls, collapse them into 1 paragraph and optionally a bulleted list of what the agent accomplished that reads like a changelog.`;
+export const DEFAULT_TOOLS_SUMMARY_PROMPT = `You are summarizing a sequence of AI assistant tool calls.
+
+Summarize the sequence in one short paragraph and, if helpful, a 3-5 item bullet list that reads like a changelog. Describe what the assistant accomplished and the user-facing outcome.
+
+Rules:
+- Focus on outcomes, not on the commands or raw output.
+- Do NOT quote tool names, command output, diffs, logs, file paths, or code.
+- Do NOT list every individual tool call; group related calls by purpose.
+- Keep the paragraph short and the bullet list optional.
+
+Example:
+The assistant inspected the repository state and verified the failing tests. It then applied the fix and confirmed all tests passed.
+
+- Confirmed the bug reproduced in the test suite
+- Updated the parser to handle nested brackets
+- Ran the full test suite and verified no regressions`;
+
+/** @deprecated Use the type-specific prompts instead. Kept for backward compatibility. */
+export const DEFAULT_SUMMARIZE_PROMPT = DEFAULT_THINKING_SUMMARY_PROMPT;
 
 function serializeThinking(thinking: string[]): string {
   return thinking.join("\n\n---\n\n");
@@ -76,7 +104,14 @@ export async function summarizeTurns(
   turns: Turn[],
   options: SummarizeOptions,
 ): Promise<void> {
-  const systemPrompt = options.prompt?.trim() || DEFAULT_SUMMARIZE_PROMPT;
+  const thinkingPrompt =
+    options.thinkingPrompt?.trim() ??
+    options.prompt?.trim() ??
+    DEFAULT_THINKING_SUMMARY_PROMPT;
+  const toolsPrompt =
+    options.toolsPrompt?.trim() ??
+    options.prompt?.trim() ??
+    DEFAULT_TOOLS_SUMMARY_PROMPT;
   const tasks: Promise<void>[] = [];
 
   for (const turn of turns) {
@@ -88,7 +123,7 @@ export async function summarizeTurns(
           const content = serializeThinking(turn.thinking);
           turn.thinkingSummary = await callLlm(
             options.model,
-            systemPrompt,
+            thinkingPrompt,
             content,
           );
         })(),
@@ -101,7 +136,7 @@ export async function summarizeTurns(
           const content = serializeTools(turn.tools);
           turn.toolsSummary = await callLlm(
             options.model,
-            systemPrompt,
+            toolsPrompt,
             content,
           );
         })(),

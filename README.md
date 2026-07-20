@@ -160,7 +160,9 @@ oc-export --config ~/.oc-export.jsonc session.json
 | `summarize.enabled` | boolean | `false` | Master switch for the summarize feature |
 | `summarize.model` | string | — | Model ID passed to `llm -m`; required when summarizing |
 | `summarize.always` | boolean | `false` | Run summarization by default without `--summarize` |
-| `summarize.prompt` | string | — | Custom system prompt for summarization |
+| `summarize.prompt` | string | — | Custom system prompt used for both block types |
+| `summarize.thinkingPrompt` | string | — | Custom system prompt for thinking summaries |
+| `summarize.toolsPrompt` | string | — | Custom system prompt for tool-call summaries |
 
 ## Summarization
 
@@ -184,6 +186,8 @@ oc-export session.json --summarize
 ```
 
 Set `summarize.always` to `true` to summarize by default without passing `--summarize`.
+
+You can override the prompts with `summarize.prompt` (applies to both block types) or with `summarize.thinkingPrompt` and `summarize.toolsPrompt` for independent control. The type-specific prompts take precedence over `prompt`.
 
 Sanitization runs before summarization, so the model only sees redacted content. The model ID cannot be supplied via the CLI.
 

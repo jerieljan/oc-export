@@ -18,6 +18,8 @@ export interface SummarizeConfig {
   model?: string;
   always?: boolean;
   prompt?: string;
+  thinkingPrompt?: string;
+  toolsPrompt?: string;
 }
 
 export interface UserConfig {
@@ -98,6 +100,8 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
     validateBoolean(config.summarize.always, "summarize.always");
     validateString(config.summarize.model, "summarize.model");
     validateString(config.summarize.prompt, "summarize.prompt");
+    validateString(config.summarize.thinkingPrompt, "summarize.thinkingPrompt");
+    validateString(config.summarize.toolsPrompt, "summarize.toolsPrompt");
   }
 
   return {

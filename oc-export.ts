@@ -133,7 +133,12 @@ async function main(): Promise<void> {
   }
 
   const summarizeOptions = doSummarize
-    ? { model: config.summarize!.model!, prompt: config.summarize!.prompt }
+    ? {
+        model: config.summarize!.model!,
+        prompt: config.summarize!.prompt,
+        thinkingPrompt: config.summarize!.thinkingPrompt,
+        toolsPrompt: config.summarize!.toolsPrompt,
+      }
     : undefined;
 
   if (args.session && args.files.length > 0) {
