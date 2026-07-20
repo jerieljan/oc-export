@@ -8,6 +8,7 @@ import {
   formatCost,
   formatDuration,
   formatTimestamp,
+  formatTimestampIsoWithTimezone,
   formatTokens,
 } from "./format.ts";
 import type { SessionMeta, SessionStats, Turn } from "./types.ts";
@@ -80,11 +81,16 @@ function generateFavicon(title: string): string {
   return `data:image/svg+xml,${encoded}`;
 }
 
-function statPair(label: string, value: string | undefined): string {
+function statPair(
+  label: string,
+  value: string | undefined,
+  title?: string,
+): string {
+  const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
   const valueHtml =
     value === undefined
       ? `<dd class="stat-na">N/A</dd>`
-      : `<dd>${escapeHtml(value)}</dd>`;
+      : `<dd${titleAttr}>${escapeHtml(value)}</dd>`;
   return `<div class="stat-pair"><dt>${escapeHtml(label)}</dt>${valueHtml}</div>`;
 }
 
@@ -107,8 +113,16 @@ function renderStats(meta: SessionMeta): string {
   if (stats) {
     rows.push(
       statRow([
-        statPair("Created", formatTimestamp(stats.createdMs)),
-        statPair("Updated", formatTimestamp(stats.updatedMs)),
+        statPair(
+          "Created",
+          formatTimestamp(stats.createdMs),
+          formatTimestampIsoWithTimezone(stats.createdMs),
+        ),
+        statPair(
+          "Updated",
+          formatTimestamp(stats.updatedMs),
+          formatTimestampIsoWithTimezone(stats.updatedMs),
+        ),
         statBlank(),
       ]),
     );
@@ -153,7 +167,13 @@ function renderStats(meta: SessionMeta): string {
 function buildPage(meta: SessionMeta, turns: Turn[]): string {
   const title = escapeHtml(meta.title);
   const created = meta.created ?? formatTimestamp(meta.stats?.createdMs);
-  const subtitle = [created, formatDuration(meta.stats?.durationMs), formatCost(meta.stats?.cost)]
+  const createdIso = formatTimestampIsoWithTimezone(meta.stats?.createdMs);
+  const createdHtml = created
+    ? createdIso
+      ? `<span title="${escapeHtml(createdIso)}">${escapeHtml(created)}</span>`
+      : escapeHtml(created)
+    : "";
+  const subtitle = [createdHtml, formatDuration(meta.stats?.durationMs), formatCost(meta.stats?.cost)]
     .filter(Boolean)
     .join(" - ");
 
@@ -188,7 +208,7 @@ ${styles()}
     <div class="header-content">
       <div>
         <h1 class="session-title">${title}</h1>
-        <p class="session-meta">${escapeHtml(subtitle)}</p>
+        <p class="session-meta">${subtitle}</p>
       </div>
       <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
         <span class="theme-icon-light">☀</span>

@@ -17,6 +17,19 @@ export function formatTimestamp(
   return new Date(ms).toLocaleString();
 }
 
+export function formatTimestampIsoWithTimezone(
+  value: string | number | undefined,
+): string | undefined {
+  const ms = parseTimestamp(value);
+  if (ms === undefined) return undefined;
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const offset = -d.getTimezoneOffset();
+  const sign = offset >= 0 ? "+" : "-";
+  const absOffset = Math.abs(offset);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${pad(Math.floor(absOffset / 60))}:${pad(absOffset % 60)}`;
+}
+
 export function formatDuration(ms: number | undefined): string | undefined {
   if (ms === undefined) return undefined;
   const totalSeconds = Math.floor(ms / 1000);
