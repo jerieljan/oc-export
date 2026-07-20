@@ -1,8 +1,9 @@
 import type { SessionMeta, Turn } from "../types.ts";
 import type { Extractor } from "./types.ts";
+import { kagiExtractor } from "./kagi.ts";
 import { opencodeExtractor } from "./opencode.ts";
 
-const extractors: Extractor[] = [opencodeExtractor];
+const extractors: Extractor[] = [kagiExtractor, opencodeExtractor];
 
 // Register a new extractor. Extractors registered later are tried first so
 // more specific matchers can win over the built-in fallback.

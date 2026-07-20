@@ -6,7 +6,7 @@ import { pickInteractive, pickSessionById } from "./src/pick.ts";
 function showHelp(): void {
   console.log(`Usage: oc-export [options] [file.json ...]
 
-Render Opencode chat sessions to standalone HTML files.
+Render chat sessions to standalone HTML files.
 
 Options:
   --session <id>   Export a session by full ID or last 8 characters and render it

@@ -1,10 +1,17 @@
 # oc-export
 
-Export and render Opencode chat sessions to standalone HTML files.
+Export and render chat sessions to standalone HTML files.
 
 ## Description
 
-`oc-export` is a CLI tool that turns Opencode chat sessions into self-contained HTML files. It can read existing JSON exports, export sessions directly from the local Opencode database, or present an interactive picker.
+`oc-export` is a CLI tool that turns chat-session JSON exports into self-contained HTML files. It supports Opencode exports out of the box and can be extended with additional extractors for other formats. It can read existing JSON exports, export sessions directly from the local Opencode database, or present an interactive picker.
+
+## Supported formats
+
+- **Opencode JSON exports** (primary format)
+- **Kagi Assistant JSON exports**
+
+Additional formats can be added by implementing an extractor in `src/extractors/` and registering it in `src/extractors/index.ts`.
 
 ## Installation
 
