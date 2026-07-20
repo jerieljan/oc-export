@@ -96,61 +96,66 @@ function statRow(items: string[]): string {
   return `<div class="stats-row">\n    ${items.join("\n")}\n  </div>`;
 }
 
-function renderStats(stats: SessionStats | undefined): string {
-  if (!stats) return "";
+function renderStats(meta: SessionMeta): string {
+  const stats = meta.stats;
+  const sessionId = meta.sessionId;
+
+  if (!stats && !sessionId) return "";
 
   const rows: string[] = [];
 
-  rows.push(
-    statRow([
-      statPair("Created", formatTimestamp(stats.createdMs)),
-      statPair("Updated", formatTimestamp(stats.updatedMs)),
-      statBlank(),
-    ]),
-  );
+  if (stats) {
+    rows.push(
+      statRow([
+        statPair("Created", formatTimestamp(stats.createdMs)),
+        statPair("Updated", formatTimestamp(stats.updatedMs)),
+        statBlank(),
+      ]),
+    );
 
-  rows.push(
-    statRow([
-      statPair("Tokens input", formatTokens(stats.tokensInput)),
-      statPair("Tokens output", formatTokens(stats.tokensOutput)),
-      statPair("Cache read", formatTokens(stats.tokensCacheRead)),
-    ]),
-  );
+    rows.push(
+      statRow([
+        statPair("Tokens input", formatTokens(stats.tokensInput)),
+        statPair("Tokens output", formatTokens(stats.tokensOutput)),
+        statPair("Cache read", formatTokens(stats.tokensCacheRead)),
+      ]),
+    );
 
-  rows.push(
-    statRow([
-      statPair("Tokens reasoning", formatTokens(stats.tokensReasoning)),
-      statPair("Reasoning parts", formatTokens(stats.reasoningParts)),
-      statPair("Tool-call parts", formatTokens(stats.toolParts)),
-    ]),
-  );
+    rows.push(
+      statRow([
+        statPair("Tokens reasoning", formatTokens(stats.tokensReasoning)),
+        statPair("Reasoning parts", formatTokens(stats.reasoningParts)),
+        statPair("Tool-call parts", formatTokens(stats.toolParts)),
+      ]),
+    );
 
-  rows.push(
-    statRow([
-      statPair("User messages", formatTokens(stats.userMessages)),
-      statPair("Assistant messages", formatTokens(stats.assistantMessages)),
-      statPair("Total messages", formatTokens(stats.totalMessages)),
-    ]),
-  );
+    rows.push(
+      statRow([
+        statPair("User messages", formatTokens(stats.userMessages)),
+        statPair("Assistant messages", formatTokens(stats.assistantMessages)),
+        statPair("Total messages", formatTokens(stats.totalMessages)),
+      ]),
+    );
+  }
+
+  const idHtml = sessionId
+    ? `<span class="session-id"> - ${escapeHtml(sessionId)}</span>`
+    : "";
 
   return `<section class="container session-stats">
-  <h2 class="session-stats-heading">Session statistics</h2>
-  <div class="stats-grid">
+  <h2 class="session-stats-heading">Session statistics${idHtml}</h2>
+  ${stats ? `<div class="stats-grid">
     ${rows.join("\n")}
-  </div>
+  </div>` : ""}
 </section>`;
 }
 
 function buildPage(meta: SessionMeta, turns: Turn[]): string {
   const title = escapeHtml(meta.title);
-  const subtitle = [
-    meta.sessionId,
-    meta.created,
-    formatDuration(meta.stats?.durationMs),
-    formatCost(meta.stats?.cost),
-  ]
+  const created = meta.created ?? formatTimestamp(meta.stats?.createdMs);
+  const subtitle = [created, formatDuration(meta.stats?.durationMs), formatCost(meta.stats?.cost)]
     .filter(Boolean)
-    .join(" · ");
+    .join(" - ");
 
   const turnHtml = turns
     .map((turn, index) => {
@@ -161,7 +166,7 @@ function buildPage(meta: SessionMeta, turns: Turn[]): string {
     })
     .join("\n");
 
-  const statsHtml = renderStats(meta.stats);
+  const statsHtml = renderStats(meta);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -553,6 +558,22 @@ html.dark .theme-icon-light {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.session-id {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-secondary);
+}
+
+.session-stats-heading:hover .session-id {
+  opacity: 1;
+  visibility: visible;
 }
 
 .stats-grid {
