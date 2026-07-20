@@ -867,6 +867,24 @@ function resolveOutputPath(inputPath: string): string {
   return path.join(path.dirname(inputPath), outputName);
 }
 
+function parseInputFile(resolved: string): unknown {
+  const text = fs.readFileSync(resolved, "utf-8");
+
+  // Some exporters (e.g. opencode) write pretty-printed JSON to a .jsonl
+  // extension. Try a single JSON parse first, then fall back to line-by-line.
+  try {
+    return JSON.parse(text);
+  } catch {
+    const messages: unknown[] = [];
+    for (const line of text.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      messages.push(JSON.parse(trimmed));
+    }
+    return messages;
+  }
+}
+
 export async function renderFile(
   inputPath: string,
   options: RenderOptions = {},
@@ -878,8 +896,7 @@ export async function renderFile(
     throw new Error(`File not found: ${display}`);
   }
 
-  const text = fs.readFileSync(resolved, "utf-8");
-  const parsed = JSON.parse(text) as unknown;
+  const parsed = parseInputFile(resolved);
   let { meta, turns } = extractSession(parsed);
 
   if (sanitize) {

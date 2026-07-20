@@ -10,31 +10,32 @@ function showHelp(): void {
 Render chat sessions to standalone HTML files.
 
 Options:
-  --session <id>   Export a session by full ID or last 8 characters and render it
-  --output <name>  Rename both output files to <name>.json and <name>.html
-  --raw            Skip sanitization
-  --no-raw         Enable sanitization (default, overrides raw: true in config)
-  --summarize      Summarize thinking and tool-call blocks using llm
-  --config <path>  Use a custom config file (default: ${DEFAULT_CONFIG_PATH})
-  --help, -h       Show this help message
+  --extractor <name>  Session source: opencode (default) or claude
+  --session <id>      Export a session by full ID or last 8 characters and render it
+  --output <name>     Rename both output files to <name>.jsonl and <name>.html
+  --raw               Skip sanitization
+  --no-raw            Enable sanitization (default, overrides raw: true in config)
+  --summarize         Summarize thinking and tool-call blocks using llm
+  --config <path>     Use a custom config file (default: ${DEFAULT_CONFIG_PATH})
+  --help, -h          Show this help message
 
 Config file:
   Settings are read from ${DEFAULT_CONFIG_PATH} if it exists.
   CLI flags override config values. Config values override defaults.
 
 Examples:
-  oc-export                           # interactive picker
-  oc-export --output report             # picker with custom output names
-  oc-export session.json              # render a JSON file
-  oc-export session.json --output report
-  oc-export a.json b.json             # render multiple JSON exports
-  oc-export --session abc123            # export and render a session
-  oc-export --session abc123 --output report
+  oc-export                               # interactive picker (default: opencode)
+  oc-export --extractor claude            # interactive picker for Claude Code
+  oc-export --extractor claude --session abc123
+  oc-export --output report               # picker with custom output names
+  oc-export session.jsonl                 # render a JSONL file
+  oc-export session.json                # render a JSON file
   oc-export --config ~/.oc-export.jsonc
 `);
 }
 
 interface ParsedArgs {
+  extractor?: string;
   raw?: boolean;
   config?: string;
   session?: string;
@@ -45,6 +46,7 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const files: string[] = [];
+  let extractor: string | undefined;
   let raw: boolean | undefined;
   let config: string | undefined;
   let session: string | undefined;
@@ -56,6 +58,13 @@ function parseArgs(argv: string[]): ParsedArgs {
     if (arg === "--help" || arg === "-h") {
       showHelp();
       process.exit(0);
+    } else if (arg === "--extractor") {
+      const next = argv[++i];
+      if (!next) {
+        console.error("Error: --extractor requires a value");
+        process.exit(1);
+      }
+      extractor = next;
     } else if (arg === "--raw") {
       raw = true;
     } else if (arg === "--no-raw") {
@@ -91,7 +100,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     }
   }
 
-  return { raw, config, session, output, summarize, files };
+  return { extractor, raw, config, session, output, summarize, files };
 }
 
 function htmlOutputPath(outputArg: string): string {
@@ -104,6 +113,9 @@ function htmlOutputPath(outputArg: string): string {
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const config = loadConfig(args.config);
+  if (args.extractor) {
+    config.extractor = args.extractor;
+  }
   const sanitize = !(args.raw ?? config.raw);
 
   const summarizeEnabled = config.summarize?.enabled === true;

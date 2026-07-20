@@ -9,10 +9,13 @@ Export and render chat sessions to standalone HTML files.
 ## Supported formats
 
 - **Opencode JSON exports** (primary format)
+- **Claude Code JSONL exports** (experimental)
 - **Kagi Assistant JSON exports**
 - **Open WebUI JSON exports**
 
 Open WebUI exports may contain multiple conversation branches; only the currently selected branch is rendered.
+
+Claude Code sessions are read directly from `~/.claude/projects`. Subagent conversations are inlined into the parent session as tool-call blocks.
 
 Additional formats can be added by implementing an extractor in `src/extractors/` and registering it in `src/extractors/index.ts`.
 
@@ -55,6 +58,13 @@ Run the interactive picker to choose a recent session:
 oc-export
 ```
 
+Use Claude Code sessions instead of Opencode:
+
+```bash
+oc-export --extractor claude
+oc-export --extractor claude --output report
+```
+
 Pick a session and write both files with custom names:
 
 ```bash
@@ -86,7 +96,12 @@ Export a session by full ID or last 8 characters:
 ```bash
 oc-export --session abc123
 oc-export --session abc123 --output report
-# Produces: report.json, report.html
+# Produces: report.jsonl, report.html
+
+# With the Claude Code source:
+oc-export --extractor claude --session abc123
+oc-export --extractor claude --session abc123 --output report
+# Produces: report.jsonl, report.html
 ```
 
 Skip sanitization with `--raw`:
@@ -155,8 +170,11 @@ oc-export --config ~/.oc-export.jsonc session.json
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `raw` | boolean | `false` | Skip sanitization by default |
+| `extractor` | string | `opencode` | Default session source: `opencode` or `claude` |
 | `picker.databasePath` | string | `~/.local/share/opencode/opencode.db` | Path to the Opencode SQLite database |
 | `picker.limit` | number | `20` | Number of recent sessions shown in the interactive picker |
+| `claude.projectsPath` | string | `~/.claude/projects` | Path to the Claude Code projects directory |
+| `claude.limit` | number | `50` | Number of recent Claude sessions shown in the interactive picker |
 | `summarize.enabled` | boolean | `false` | Master switch for the summarize feature |
 | `summarize.model` | string | — | Model ID passed to `llm -m`; required when summarizing |
 | `summarize.always` | boolean | `false` | Run summarization by default without `--summarize` |
@@ -201,7 +219,8 @@ Sanitization is enabled by default. It redacts common PII (names, emails, phones
 ## Requirements
 
 - Bun
-- The `opencode` CLI must be installed and on PATH for `--session` and interactive picker modes.
+- The `opencode` CLI must be installed and on PATH for `--session` and interactive picker modes when using the `opencode` extractor.
+- The Claude Code extractor reads `~/.claude/projects` directly; no additional CLI is required.
 - The `llm` CLI must be installed and on PATH to use `--summarize`.
 
 ## Generated output

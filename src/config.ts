@@ -13,6 +13,11 @@ export interface PickerConfig {
   limit: number;
 }
 
+export interface ClaudeConfig {
+  projectsPath: string;
+  limit: number;
+}
+
 export interface SummarizeConfig {
   enabled: boolean;
   model?: string;
@@ -24,13 +29,17 @@ export interface SummarizeConfig {
 
 export interface UserConfig {
   raw?: boolean;
+  extractor?: string;
   picker?: Partial<PickerConfig>;
+  claude?: Partial<ClaudeConfig>;
   summarize?: SummarizeConfig;
 }
 
 export interface ResolvedConfig {
   raw: boolean;
+  extractor: string;
   picker: PickerConfig;
+  claude: ClaudeConfig;
   summarize?: SummarizeConfig;
 }
 
@@ -42,9 +51,16 @@ export const DEFAULT_PICKER_CONFIG: PickerConfig = {
   limit: 20,
 };
 
+export const DEFAULT_CLAUDE_CONFIG: ClaudeConfig = {
+  projectsPath: path.join(os.homedir(), ".claude/projects"),
+  limit: 50,
+};
+
 export const DEFAULT_CONFIG: ResolvedConfig = {
   raw: false,
+  extractor: "opencode",
   picker: DEFAULT_PICKER_CONFIG,
+  claude: DEFAULT_CLAUDE_CONFIG,
 };
 
 function expandHomeDir(inputPath: string): string {
@@ -83,6 +99,7 @@ function validatePositiveNumber(
 
 function validateUserConfig(config: UserConfig): ResolvedConfig {
   validateBoolean(config.raw, "raw");
+  validateString(config.extractor, "extractor");
 
   if (config.picker !== undefined && typeof config.picker !== "object") {
     throw new Error('Config error: "picker" must be an object');
@@ -90,6 +107,13 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
 
   validateString(config.picker?.databasePath, "picker.databasePath");
   validatePositiveNumber(config.picker?.limit, "picker.limit");
+
+  if (config.claude !== undefined && typeof config.claude !== "object") {
+    throw new Error('Config error: "claude" must be an object');
+  }
+
+  validateString(config.claude?.projectsPath, "claude.projectsPath");
+  validatePositiveNumber(config.claude?.limit, "claude.limit");
 
   if (config.summarize !== undefined && typeof config.summarize !== "object") {
     throw new Error('Config error: "summarize" must be an object');
@@ -106,11 +130,18 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
 
   return {
     raw: config.raw ?? DEFAULT_CONFIG.raw,
+    extractor: config.extractor ?? DEFAULT_CONFIG.extractor,
     picker: {
       databasePath: config.picker?.databasePath
         ? expandHomeDir(config.picker.databasePath)
         : DEFAULT_PICKER_CONFIG.databasePath,
       limit: config.picker?.limit ?? DEFAULT_PICKER_CONFIG.limit,
+    },
+    claude: {
+      projectsPath: config.claude?.projectsPath
+        ? expandHomeDir(config.claude.projectsPath)
+        : DEFAULT_CLAUDE_CONFIG.projectsPath,
+      limit: config.claude?.limit ?? DEFAULT_CLAUDE_CONFIG.limit,
     },
     summarize: config.summarize,
   };
