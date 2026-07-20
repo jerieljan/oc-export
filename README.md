@@ -10,6 +10,9 @@ Export and render chat sessions to standalone HTML files.
 
 - **Opencode JSON exports** (primary format)
 - **Kagi Assistant JSON exports**
+- **Open WebUI JSON exports**
+
+Open WebUI exports may contain multiple conversation branches; only the currently selected branch is rendered.
 
 Additional formats can be added by implementing an extractor in `src/extractors/` and registering it in `src/extractors/index.ts`.
 
