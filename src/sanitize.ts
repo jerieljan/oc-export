@@ -46,6 +46,15 @@ function sanitizePaths(text: string): string {
     return `\u0000URL_${urls.length - 1}\u0000`;
   });
 
+  // Protect inline code spans so slash commands such as /model are not
+  // mistaken for absolute paths.
+  const codeSpanRegex = /`[^`]*`/g;
+  const codeSpans: string[] = [];
+  protectedText = protectedText.replace(codeSpanRegex, (span) => {
+    codeSpans.push(span);
+    return `\u0000CODE_${codeSpans.length - 1}\u0000`;
+  });
+
   // Replace known prefixes (cwd and home) first, because they may contain
   // spaces and we want cwd to win over home when a path is under both.
   protectedText = replaceKnownPrefix(protectedText, CWD, true);
@@ -69,11 +78,10 @@ function sanitizePaths(text: string): string {
     },
   );
 
-  // Restore protected URLs.
-  return protectedText.replace(
-    /\u0000URL_(\d+)\u0000/g,
-    (_, index: string) => urls[parseInt(index, 10)]!,
-  );
+  // Restore protected URLs and code spans.
+  return protectedText
+    .replace(/\u0000URL_(\d+)\u0000/g, (_, index: string) => urls[parseInt(index, 10)]!)
+    .replace(/\u0000CODE_(\d+)\u0000/g, (_, index: string) => codeSpans[parseInt(index, 10)]!);
 }
 
 function replaceKnownPrefix(text: string, prefix: string, allowCwd: boolean): string {

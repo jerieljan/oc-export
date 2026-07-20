@@ -95,24 +95,64 @@ function parseTimestamp(value: string | undefined): number | undefined {
   return isNaN(ms) ? undefined : ms;
 }
 
+const NON_CONVERSATION_TYPES = new Set([
+  "system",
+  "last-prompt",
+  "mode",
+  "permission-mode",
+  "ai-title",
+  "file-history-snapshot",
+  "queue-operation",
+]);
+
 function collectMainBranch(messages: ClaudeMessage[]): ClaudeMessage[] {
   const byUuid = new Map<string, ClaudeMessage>();
-  let leaf: ClaudeMessage | null = null;
 
   for (const message of messages) {
     if (message.uuid) {
       byUuid.set(message.uuid, message);
     }
-    if (message.type === "last-prompt" && message.leafUuid) {
-      leaf = byUuid.get(message.leafUuid as string) ?? null;
+  }
+
+  // Use the latest conversation message by timestamp as the leaf. Claude's
+  // last-prompt entry points to the last user prompt, but the final assistant
+  // response is a child of that prompt and has a later timestamp.
+  let leaf: ClaudeMessage | null = null;
+  let latestMs = -Infinity;
+
+  for (const message of messages) {
+    if (
+      message.uuid &&
+      message.type &&
+      !NON_CONVERSATION_TYPES.has(message.type)
+    ) {
+      const ms = parseTimestamp(message.timestamp) ?? 0;
+      if (ms > latestMs) {
+        latestMs = ms;
+        leaf = message;
+      }
     }
   }
 
-  // If no explicit leaf, use the last non-system message with a uuid.
+  // Fallback: use the last-prompt leafUuid if present.
+  if (!leaf) {
+    for (const message of messages) {
+      if (message.type === "last-prompt" && message.leafUuid) {
+        leaf = byUuid.get(message.leafUuid as string) ?? null;
+        if (leaf) break;
+      }
+    }
+  }
+
+  // Final fallback: use the last non-system message with a uuid.
   if (!leaf) {
     for (let i = messages.length - 1; i >= 0; i--) {
       const message = messages[i]!;
-      if (message.uuid && message.type !== "system" && message.type !== "last-prompt") {
+      if (
+        message.uuid &&
+        message.type &&
+        !NON_CONVERSATION_TYPES.has(message.type)
+      ) {
         leaf = message;
         break;
       }
@@ -195,9 +235,95 @@ function unescapeClaudeString(text: string): string {
     .replace(/\\\\/g, "\\");
 }
 
+const CLAUDE_META_TAG_NAMES = [
+  "local-command-caveat",
+  "command-name",
+  "command-message",
+  "command-args",
+  "local-command-stdout",
+  "task-notification",
+];
+
+const CLAUDE_META_TAG_PATTERN = new RegExp(
+  `<(?:${CLAUDE_META_TAG_NAMES.join("|")})>[\\s\\S]*?</(?:${CLAUDE_META_TAG_NAMES.join("|")})>`,
+  "g",
+);
+
+function getFullTagRegex(tagName: string): RegExp {
+  return new RegExp(`^\\s*<${tagName}>([\\s\\S]*)</${tagName}>\\s*$`);
+}
+
+function stripAnsiCodes(text: string): string {
+  return text.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+function isPureMetaTagContent(text: string): boolean {
+  return text.replace(CLAUDE_META_TAG_PATTERN, "").trim().length === 0;
+}
+
+interface MetaTagClassification {
+  type: "command" | "output" | "drop";
+  content: string;
+}
+
+function extractTagContent(text: string, tagName: string): string | undefined {
+  const match = new RegExp(`<${tagName}>([\\s\\S]*?)</${tagName}>`).exec(text);
+  if (!match) return undefined;
+  return unescapeClaudeString(match[1]!).trim();
+}
+
+function classifyMetaTagMessage(text: string): MetaTagClassification | null {
+  if (!isPureMetaTagContent(text)) return null;
+
+  if (getFullTagRegex("local-command-caveat").test(text)) {
+    return { type: "drop", content: "" };
+  }
+  if (getFullTagRegex("task-notification").test(text)) {
+    return { type: "drop", content: "" };
+  }
+
+  const commandStdout = extractTagContent(text, "local-command-stdout");
+  if (commandStdout !== undefined) {
+    return { type: "output", content: commandStdout };
+  }
+
+  const commandName = extractTagContent(text, "command-name");
+  if (commandName !== undefined) {
+    return { type: "command", content: commandName };
+  }
+
+  const commandMessage = extractTagContent(text, "command-message");
+  if (commandMessage !== undefined) {
+    return {
+      type: "command",
+      content: commandMessage.startsWith("/") ? commandMessage : `/${commandMessage}`,
+    };
+  }
+
+  const commandArgs = extractTagContent(text, "command-args");
+  if (commandArgs !== undefined) {
+    return { type: "command", content: commandArgs };
+  }
+
+  return null;
+}
+
+function formatCommandOutput(command: string, output: string): string {
+  const indentedOutput = output
+    .split("\n")
+    .map((line) => `> ⎿ ${line}`)
+    .join("\n");
+  if (!command) return indentedOutput;
+  return `> \`${command}\`\n${indentedOutput}`;
+}
+
+function formatCommandOnly(command: string): string {
+  return `> \`${command}\``;
+}
+
 function extractUserText(content: unknown): string {
   if (typeof content === "string") {
-    return unescapeClaudeString(content);
+    return stripAnsiCodes(unescapeClaudeString(content));
   }
   if (!Array.isArray(content)) return "";
 
@@ -207,7 +333,7 @@ function extractUserText(content: unknown): string {
     const block = item as ContentBlock;
     if (block.type === "tool_result") continue;
     if (block.type === "text" && block.text) {
-      texts.push(unescapeClaudeString(block.text));
+      texts.push(stripAnsiCodes(unescapeClaudeString(block.text)));
     }
   }
   return texts.join("\n\n");
@@ -440,33 +566,61 @@ function parseJsonlSession(data: unknown): { meta: SessionMeta; turns: Turn[] } 
       const rawContent = message.message?.content;
       const content = extractUserText(rawContent);
       const synthetic = attachmentContext.get(message.uuid || "") ?? [];
+
+      const meta = typeof content === "string"
+        ? classifyMetaTagMessage(content)
+        : null;
+      if (meta?.type === "drop") {
+        continue;
+      }
+
+      let finalContent = content;
+      if (meta?.type === "command") {
+        const nextMessage = mainBranch[i + 1];
+        if (nextMessage?.type === "user") {
+          const nextContent = extractUserText(nextMessage.message?.content);
+          const nextMeta = typeof nextContent === "string"
+            ? classifyMetaTagMessage(nextContent)
+            : null;
+          if (nextMeta?.type === "output") {
+            i++;
+            finalContent = formatCommandOutput(meta.content, nextMeta.content);
+          } else {
+            finalContent = formatCommandOnly(meta.content);
+          }
+        } else {
+          finalContent = formatCommandOnly(meta.content);
+        }
+      } else if (meta?.type === "output") {
+        finalContent = formatCommandOutput("", meta.content);
+      }
+
       turns.push({
         role: "user",
         thinking: [],
         tools: [],
-        content,
+        content: finalContent,
         synthetic,
       });
       continue;
     }
 
     if (message.type === "assistant") {
-      // Group consecutive assistant messages that share the same parentUuid
-      // and message id into one turn.
+      // Group consecutive assistant messages that share the same message id
+      // (or the same parentUuid when id is missing) into one turn.
       const group: ClaudeMessage[] = [message];
       const parentId = message.parentUuid;
       const messageId = message.message?.id;
       for (let j = i + 1; j < mainBranch.length; j++) {
         const next = mainBranch[j]!;
-        if (
-          next.type === "assistant" &&
-          next.parentUuid === parentId &&
-          next.message?.id === messageId
-        ) {
-          group.push(next);
+        if (next.type !== "assistant") break;
+        const nextMessageId = next.message?.id;
+        if (messageId && nextMessageId) {
+          if (nextMessageId !== messageId) break;
         } else {
-          break;
+          if (next.parentUuid !== parentId) break;
         }
+        group.push(next);
       }
       i += group.length - 1;
       assistantCount++;
