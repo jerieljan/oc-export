@@ -1,0 +1,23 @@
+// Example configuration file for oc-export.
+// Copy this file to ~/.config/oc-export/config.jsonc and edit it to suit
+// your preferences. oc-export reads that file automatically if it exists.
+//
+// CLI flags always override config values. Config values override built-in
+// defaults. Missing config files are ignored. Malformed config files are
+// fatal errors with a clear message.
+
+{
+  // Skip sanitization by default. When true, oc-export behaves as if --raw
+  // was passed unless you explicitly use --no-raw on the command line.
+  "raw": false,
+
+  // Options for the interactive session picker and --session lookups.
+  "picker": {
+    // Path to the local Opencode SQLite database. The ~ prefix is expanded
+    // to your home directory.
+    "databasePath": "~/.local/share/opencode/opencode.db",
+
+    // Number of recent sessions shown in the interactive picker.
+    "limit": 20
+  }
+}

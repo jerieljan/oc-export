@@ -1,17 +1,15 @@
 import { Database } from "bun:sqlite";
-import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import readline from "node:readline/promises";
+import { DEFAULT_CONFIG, type ResolvedConfig } from "./config.ts";
 import { sanitizePathForDisplay } from "./sanitize.ts";
 import { renderFile } from "./render.ts";
-
-const DB_PATH = path.join(os.homedir(), ".local/share/opencode/opencode.db");
-const LIMIT = 20;
 
 export interface PickOptions {
   sanitize?: boolean;
   outputBase?: string;
+  config?: ResolvedConfig;
 }
 
 interface SessionRow {
@@ -52,8 +50,11 @@ async function runExportToFile(id: string, jsonPath: string): Promise<void> {
   }
 }
 
-async function findSessionByIdOrSuffix(idOrSuffix: string): Promise<SessionRow> {
-  const db = new Database(DB_PATH, { readonly: true, create: false });
+async function findSessionByIdOrSuffix(
+  idOrSuffix: string,
+  databasePath: string,
+): Promise<SessionRow> {
+  const db = new Database(databasePath, { readonly: true, create: false });
 
   const exact = db
     .query(
@@ -117,7 +118,7 @@ export async function exportAndRenderSession(
   id: string,
   options: PickOptions = {},
 ): Promise<void> {
-  const { sanitize = true } = options;
+  const { sanitize = true, config = DEFAULT_CONFIG } = options;
   const { jsonPath, htmlPath } = resolveSessionOutputPaths(id, options.outputBase);
 
   const displayJson = sanitize ? sanitizePathForDisplay(jsonPath) : path.basename(jsonPath);
@@ -133,8 +134,10 @@ export async function exportAndRenderSession(
 }
 
 export async function pickInteractive(options: PickOptions = {}): Promise<void> {
-  const { sanitize = true } = options;
-  const db = new Database(DB_PATH, { readonly: true, create: false });
+  const { sanitize = true, config = DEFAULT_CONFIG } = options;
+  const dbPath = config.picker.databasePath;
+  const limit = config.picker.limit;
+  const db = new Database(dbPath, { readonly: true, create: false });
   const rows = db
     .query(
       `SELECT id, title, directory, time_updated
@@ -142,14 +145,14 @@ export async function pickInteractive(options: PickOptions = {}): Promise<void> 
        ORDER BY time_updated DESC
        LIMIT $limit`,
     )
-    .all({ $limit: LIMIT }) as SessionRow[];
+    .all({ $limit: limit }) as SessionRow[];
   db.close();
 
   if (rows.length === 0) {
     throw new Error("No sessions found.");
   }
 
-  console.log(`\nNewest sessions (limit ${LIMIT}):\n`);
+  console.log(`\nNewest sessions (limit ${limit}):\n`);
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]!;
     const idx = String(i + 1).padStart(2, " ");
@@ -179,6 +182,7 @@ export async function pickSessionById(
   idOrSuffix: string,
   options: PickOptions = {},
 ): Promise<void> {
-  const row = await findSessionByIdOrSuffix(idOrSuffix);
+  const { config = DEFAULT_CONFIG } = options;
+  const row = await findSessionByIdOrSuffix(idOrSuffix, config.picker.databasePath);
   await exportAndRenderSession(row.id, options);
 }

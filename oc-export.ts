@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import path from "node:path";
+import { loadConfig, DEFAULT_CONFIG_PATH, type ResolvedConfig } from "./src/config.ts";
 import { renderFile, renderFiles } from "./src/render.ts";
 import { pickInteractive, pickSessionById } from "./src/pick.ts";
 
@@ -11,22 +12,30 @@ Render chat sessions to standalone HTML files.
 Options:
   --session <id>   Export a session by full ID or last 8 characters and render it
   --output <name>  Rename both output files to <name>.json and <name>.html
-  --raw            Skip sanitization (sanitization is enabled by default)
+  --raw            Skip sanitization
+  --no-raw         Enable sanitization (default, overrides raw: true in config)
+  --config <path>  Use a custom config file (default: ${DEFAULT_CONFIG_PATH})
   --help, -h       Show this help message
+
+Config file:
+  Settings are read from ${DEFAULT_CONFIG_PATH} if it exists.
+  CLI flags override config values. Config values override defaults.
 
 Examples:
   oc-export                           # interactive picker
   oc-export --output report             # picker with custom output names
   oc-export session.json              # render a JSON file
   oc-export session.json --output report
-  oc-export a.json b.json             # render multiple JSON files
+  oc-export a.json b.json             # render multiple JSON exports
   oc-export --session abc123            # export and render a session
   oc-export --session abc123 --output report
+  oc-export --config ~/.oc-export.jsonc
 `);
 }
 
 interface ParsedArgs {
-  raw: boolean;
+  raw?: boolean;
+  config?: string;
   session?: string;
   output?: string;
   files: string[];
@@ -34,7 +43,8 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const files: string[] = [];
-  let raw = false;
+  let raw: boolean | undefined;
+  let config: string | undefined;
   let session: string | undefined;
   let output: string | undefined;
 
@@ -45,6 +55,15 @@ function parseArgs(argv: string[]): ParsedArgs {
       process.exit(0);
     } else if (arg === "--raw") {
       raw = true;
+    } else if (arg === "--no-raw") {
+      raw = false;
+    } else if (arg === "--config") {
+      const next = argv[++i];
+      if (!next) {
+        console.error("Error: --config requires a value");
+        process.exit(1);
+      }
+      config = next;
     } else if (arg === "--session") {
       const next = argv[++i];
       if (!next) {
@@ -67,7 +86,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     }
   }
 
-  return { raw, session, output, files };
+  return { raw, config, session, output, files };
 }
 
 function htmlOutputPath(outputArg: string): string {
@@ -79,7 +98,8 @@ function htmlOutputPath(outputArg: string): string {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  const sanitize = !args.raw;
+  const config = loadConfig(args.config);
+  const sanitize = !(args.raw ?? config.raw);
 
   if (args.session && args.files.length > 0) {
     console.error("Error: --session cannot be combined with input files");
@@ -94,12 +114,12 @@ async function main(): Promise<void> {
   }
 
   if (args.session) {
-    await pickSessionById(args.session, { sanitize, outputBase: args.output });
+    await pickSessionById(args.session, { sanitize, outputBase: args.output, config });
     return;
   }
 
   if (args.files.length === 0) {
-    await pickInteractive({ sanitize, outputBase: args.output });
+    await pickInteractive({ sanitize, outputBase: args.output, config });
     return;
   }
 

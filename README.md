@@ -103,9 +103,57 @@ bun run dev
 bun run dev --session abc123
 ```
 
+## Configuration file
+
+`oc-export` reads settings from `~/.config/oc-export/config.jsonc` if the file exists. The file is JSONC, so comments are allowed. Missing files are ignored. Malformed files are fatal errors with a clear message.
+
+CLI flags always override config values. Config values override built-in defaults.
+
+A starter template is included in this repo as `config-example.jsonc`. Copy it to `~/.config/oc-export/config.jsonc` and edit from there:
+
+```bash
+mkdir -p ~/.config/oc-export
+cp config-example.jsonc ~/.config/oc-export/config.jsonc
+```
+
+### Example
+
+Create `~/.config/oc-export/config.jsonc` to make `--raw` the default and change the interactive picker limit:
+
+```jsonc
+{
+  // Skip sanitization by default
+  "raw": true,
+  "picker": {
+    "databasePath": "~/.local/share/opencode/opencode.db",
+    "limit": 20
+  }
+}
+```
+
+Override `raw: true` for a single run:
+
+```bash
+oc-export session.json --no-raw
+```
+
+Use a custom config file:
+
+```bash
+oc-export --config ~/.oc-export.jsonc session.json
+```
+
+### Supported options
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `raw` | boolean | `false` | Skip sanitization by default |
+| `picker.databasePath` | string | `~/.local/share/opencode/opencode.db` | Path to the Opencode SQLite database |
+| `picker.limit` | number | `20` | Number of recent sessions shown in the interactive picker |
+
 ## Sanitization
 
-Sanitization is enabled by default. It redacts common PII (names, emails, phones, credit cards, SSNs) using `@redactpii/node` and replaces absolute file paths with relative paths or `~` references. Use `--raw` to disable it.
+Sanitization is enabled by default. It redacts common PII (names, emails, phones, credit cards, SSNs) using `@redactpii/node` and replaces absolute file paths with relative paths or `~` references. Use `--raw` to disable it, or `--no-raw` to re-enable it when `raw: true` is set in the config.
 
 - Name detection is regex/greeting-based, so not every name will be caught.
 - Paths with spaces or inside URLs are handled conservatively; local `file://` paths are still sanitized.

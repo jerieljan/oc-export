@@ -6,7 +6,9 @@
 complete -c oc-export -s h -l help -f -d "Show help message"
 complete -c oc-export -l session -x -d "Export a session by full ID or last 8 characters"
 complete -c oc-export -l output -rF -d "Rename output files to <name>.json and <name>.html"
-complete -c oc-export -l raw -f -d "Skip sanitization (enabled by default)"
+complete -c oc-export -l raw -f -d "Skip sanitization"
+complete -c oc-export -l no-raw -f -d "Enable sanitization (default, overrides raw: true in config)"
+complete -c oc-export -l config -rF -d "Use a custom config file"
 
 # Positional arguments: JSON export files
 complete -c oc-export -n "not __fish_seen_argument --session --output --help -h" -F
