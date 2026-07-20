@@ -9,7 +9,9 @@ export const DEFAULT_SUMMARIZE_PROMPT = `You are provided the thinking or tool c
 
 Your task is to provide a concise summary of it, to illustrate what happened in that section of work performed by the AI agent.
 
-Thinking sessions illustrate the agent's thinking process, and are best summarized in 1-2 paragraphs, shorter than the original.
+Thinking sessions depict the AI agent's thoughts and understanding, and are best summarized in 1-2 paragraphs, shorter than the original.
+
+Tool calls represent execution, which may or may not include the user's response followed by a series of actions performed by the AI agent.
 
 For series of tool calls, collapse them into 1 paragraph and optionally a bulleted list of what the agent accomplished that reads like a changelog.`;
 
