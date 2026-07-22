@@ -219,10 +219,19 @@ ${styles()}
         <h1 class="session-title">${title}</h1>
         <p class="session-meta">${subtitle}</p>
       </div>
-      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
-        <span class="theme-icon-light">☀</span>
-        <span class="theme-icon-dark">☾</span>
-      </button>
+      <div class="header-actions">
+        <button class="download-toggle" id="download-toggle" aria-label="Download this page">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+          <span class="theme-icon-light">☀</span>
+          <span class="theme-icon-dark">☾</span>
+        </button>
+      </div>
     </div>
   </div>
 </header>
@@ -487,6 +496,13 @@ body {
   gap: 1rem;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .session-title {
   margin: 0;
   font-family: var(--font-heading);
@@ -502,7 +518,8 @@ body {
   color: var(--text-secondary);
 }
 
-.theme-toggle {
+.theme-toggle,
+.download-toggle {
   background: var(--bg);
   border: 1px solid var(--border-strong);
   border-radius: 9999px;
@@ -515,10 +532,17 @@ body {
   color: var(--text);
   font-size: 1.1rem;
   transition: background 0.2s ease, border-color 0.2s ease;
+  padding: 0;
 }
 
-.theme-toggle:hover {
+.theme-toggle:hover,
+.download-toggle:hover {
   background: var(--border);
+}
+
+.download-toggle svg {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 html:not(.dark) .theme-icon-dark {
@@ -1029,6 +1053,21 @@ function scripts(): string {
   toggle.addEventListener('click', function() {
     const isDark = root.classList.toggle('dark');
     localStorage.setItem('opencode-theme', isDark ? 'dark' : 'light');
+  });
+
+  const download = document.getElementById('download-toggle');
+  download.addEventListener('click', function() {
+    const html = '<!DOCTYPE html>\\n' + document.documentElement.outerHTML;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const filename = (document.title || 'page').replace(/[^\\w\\-]+/g, '_').replace(/^_+|_+$/g, '') || 'page';
+    link.download = filename + '.html';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   });
 })();
 `;
