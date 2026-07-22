@@ -59,5 +59,23 @@
 
     // Optional custom prompt for tool-call summaries. Takes precedence over prompt.
     // "toolsPrompt": "..."
+  },
+
+  // Navigation bar shown at the bottom of exported HTML pages. It shows a
+  // scrollable row of pills, one per turn, and highlights the turn currently
+  // in view.
+  "navigation": {
+    // Master switch. When false, the bottom navigation bar is never rendered.
+    "enabled": true,
+
+    // Only show the bar when the session has at least this many turns.
+    // A value of 0 means the bar is always shown.
+    "minTurns": 0,
+
+    // Show a thin progress line at the top of the bar.
+    "progressBar": true,
+
+    // Color pills by role: darker for user turns, lighter for assistant turns.
+    "roleColor": true
   }
 }

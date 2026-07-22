@@ -27,6 +27,13 @@ export interface SummarizeConfig {
   toolsPrompt?: string;
 }
 
+export interface NavigationConfig {
+  enabled?: boolean;
+  minTurns?: number;
+  progressBar?: boolean;
+  roleColor?: boolean;
+}
+
 export interface UserConfig {
   raw?: boolean;
   extractor?: string;
@@ -34,6 +41,7 @@ export interface UserConfig {
   picker?: Partial<PickerConfig>;
   claude?: Partial<ClaudeConfig>;
   summarize?: SummarizeConfig;
+  navigation?: NavigationConfig;
 }
 
 export interface ResolvedConfig {
@@ -43,6 +51,7 @@ export interface ResolvedConfig {
   picker: PickerConfig;
   claude: ClaudeConfig;
   summarize?: SummarizeConfig;
+  navigation?: NavigationConfig;
 }
 
 export const DEFAULT_PICKER_CONFIG: PickerConfig = {
@@ -99,6 +108,18 @@ function validatePositiveNumber(
   }
 }
 
+function validateNonNegativeInteger(
+  value: unknown,
+  key: string,
+): asserts value is number | undefined {
+  if (
+    value !== undefined &&
+    (typeof value !== "number" || value < 0 || !Number.isInteger(value))
+  ) {
+    throw new Error(`Config error: "${key}" must be a non-negative integer`);
+  }
+}
+
 function validateUserConfig(config: UserConfig): ResolvedConfig {
   validateBoolean(config.raw, "raw");
   validateString(config.extractor, "extractor");
@@ -131,6 +152,17 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
     validateString(config.summarize.toolsPrompt, "summarize.toolsPrompt");
   }
 
+  if (config.navigation !== undefined && typeof config.navigation !== "object") {
+    throw new Error('Config error: "navigation" must be an object');
+  }
+
+  if (config.navigation) {
+    validateBoolean(config.navigation.enabled, "navigation.enabled");
+    validateNonNegativeInteger(config.navigation.minTurns, "navigation.minTurns");
+    validateBoolean(config.navigation.progressBar, "navigation.progressBar");
+    validateBoolean(config.navigation.roleColor, "navigation.roleColor");
+  }
+
   return {
     raw: config.raw ?? DEFAULT_CONFIG.raw,
     extractor: config.extractor ?? DEFAULT_CONFIG.extractor,
@@ -148,6 +180,7 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
       limit: config.claude?.limit ?? DEFAULT_CLAUDE_CONFIG.limit,
     },
     summarize: config.summarize,
+    navigation: config.navigation,
   };
 }
 

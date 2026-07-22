@@ -71,6 +71,7 @@ export async function exportAndRenderSession(
     outputPath: htmlPath,
     summarize,
     username: config.username,
+    navigation: config.navigation,
   });
 
   console.log(`Done: ${displayJson} → ${displayHtml}`);

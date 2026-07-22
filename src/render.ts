@@ -4,6 +4,7 @@ import MarkdownIt from "markdown-it";
 import { sanitizePathForDisplay, sanitizeText } from "./sanitize.ts";
 import { extractSession } from "./extractors/index.ts";
 import { summarizeTurns, type SummarizeOptions } from "./summarize.ts";
+import type { NavigationConfig } from "./config.ts";
 import {
   formatCost,
   formatDuration,
@@ -25,6 +26,7 @@ export interface RenderOptions {
   outputPath?: string;
   summarize?: SummarizeOptions;
   username?: string;
+  navigation?: NavigationConfig;
 }
 
 function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
@@ -173,7 +175,50 @@ function renderStats(meta: SessionMeta): string {
 </section>`;
 }
 
-function buildPage(meta: SessionMeta, turns: Turn[], username?: string): string {
+function renderTurnScrubber(
+  turns: Turn[],
+  navigation?: NavigationConfig,
+): string {
+  const nav = {
+    enabled: navigation?.enabled ?? true,
+    minTurns: navigation?.minTurns ?? 0,
+    progressBar: navigation?.progressBar ?? true,
+    roleColor: navigation?.roleColor ?? true,
+  };
+
+  if (!nav.enabled || turns.length < nav.minTurns) {
+    return "";
+  }
+
+  const progressHtml = nav.progressBar
+    ? `<div class="turn-scrubber-progress" id="turn-scrubber-progress"></div>`
+    : "";
+
+  const links = turns
+    .map((turn, index) => {
+      const roleClass = turn.role === "user" ? "role-user" : "role-assistant";
+      const classes = nav.roleColor
+        ? `turn-scrubber-link ${roleClass}`
+        : "turn-scrubber-link";
+      return `<a href="#turn-${index}" class="${classes}" data-turn="${index}" title="Turn ${index + 1}">${index + 1}</a>`;
+    })
+    .join("\n");
+
+  return `
+<nav class="turn-scrubber" aria-label="Turn navigation">
+  <div class="turn-scrubber-track">
+    ${links}
+  </div>
+  ${progressHtml}
+</nav>`;
+}
+
+function buildPage(
+  meta: SessionMeta,
+  turns: Turn[],
+  username?: string,
+  navigation?: NavigationConfig,
+): string {
   const title = escapeHtml(meta.title);
   const created = meta.created ?? formatTimestamp(meta.stats?.createdMs);
   const createdIso = formatTimestampIsoWithTimezone(meta.stats?.createdMs);
@@ -196,6 +241,14 @@ function buildPage(meta: SessionMeta, turns: Turn[], username?: string): string 
     .join("\n");
 
   const statsHtml = renderStats(meta);
+  const navConfig = {
+    enabled: navigation?.enabled ?? true,
+    minTurns: navigation?.minTurns ?? 0,
+    progressBar: navigation?.progressBar ?? true,
+    roleColor: navigation?.roleColor ?? true,
+  };
+  const navHtml = renderTurnScrubber(turns, navConfig);
+  const activeNav = navHtml !== "" ? navConfig : undefined;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -208,7 +261,7 @@ function buildPage(meta: SessionMeta, turns: Turn[], username?: string): string 
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=Geist+Mono:wght@400;500&family=League+Spartan:wght@600;700&display=swap">
 <style>
-${styles()}
+${styles(activeNav)}
 </style>
 </head>
 <body>
@@ -239,8 +292,9 @@ ${styles()}
 ${turnHtml}
 </main>
 ${statsHtml}
+${navHtml}
 <script>
-${scripts()}
+${scripts(activeNav)}
 </script>
 </body>
 </html>`;
@@ -410,7 +464,7 @@ function renderAssistantTurn(turn: Turn, index: number): string {
 </article>`;
 }
 
-function styles(): string {
+function styles(navigation?: NavigationConfig): string {
   return `
 :root {
   --font-body: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -433,6 +487,10 @@ function styles(): string {
   --badge-user-text: #ffffff;
   --badge-assistant-text: #ffffff;
   --shadow: 0 1px 2px rgba(15, 23, 43, 0.06), 0 4px 12px rgba(15, 23, 43, 0.04);
+  --nav-user-bg: #0f172b;
+  --nav-user-text: #f8fafc;
+  --nav-assistant-bg: #e2e8f0;
+  --nav-assistant-text: #0f172b;
 }
 
 html.dark {
@@ -453,6 +511,10 @@ html.dark {
   --badge-user-text: #0f172b;
   --badge-assistant-text: #0f172b;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+  --nav-user-bg: #020618;
+  --nav-user-text: #f8fafc;
+  --nav-assistant-bg: #314158;
+  --nav-assistant-text: #f8fafc;
 }
 
 * {
@@ -461,6 +523,7 @@ html.dark {
 
 html {
   font-size: 16px;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -560,6 +623,7 @@ html.dark .theme-icon-light {
 
 .turn {
   margin-bottom: 2.5rem;
+  scroll-margin-top: 7.10rem;
 }
 
 .turn-header {
@@ -1004,6 +1068,7 @@ html.dark .theme-icon-light {
   margin: 1.5rem 0;
 }
 
+${navigation ? scrubberStyles(navigation) : ''}
 @media (max-width: 640px) {
   html {
     font-size: 15px;
@@ -1040,7 +1105,125 @@ html.dark .theme-icon-light {
 `;
 }
 
-function scripts(): string {
+function scrubberStyles(navigation: NavigationConfig): string {
+  const progressBar = navigation.progressBar ?? true;
+  const roleColor = navigation.roleColor ?? true;
+  const progressStyles = progressBar
+    ? `
+.turn-scrubber-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.3s ease;
+  z-index: 21;
+}
+`
+    : "";
+  const roleStyles = roleColor
+    ? `
+.turn-scrubber-link.role-user {
+  background: var(--nav-user-bg);
+  color: var(--nav-user-text);
+}
+
+.turn-scrubber-link.role-user:hover {
+  background: color-mix(in srgb, var(--nav-user-bg) 85%, white 15%);
+}
+
+.turn-scrubber-link.role-assistant {
+  background: var(--nav-assistant-bg);
+  color: var(--nav-assistant-text);
+}
+
+.turn-scrubber-link.role-assistant:hover {
+  background: color-mix(in srgb, var(--nav-assistant-bg) 85%, black 15%);
+}
+
+.turn-scrubber-link.role-user.active-turn,
+.turn-scrubber-link.role-assistant.active-turn {
+  outline-color: var(--accent-light);
+}
+`
+    : "";
+
+  return `
+body {
+  padding-bottom: calc(48px + 2rem);
+}
+
+.turn-scrubber {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border-strong);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+}
+
+.turn-scrubber-track {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 1rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: safe center;
+  scroll-behavior: smooth;
+}
+
+.turn-scrubber-track::-webkit-scrollbar {
+  display: none;
+}
+
+.turn-scrubber-link {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: transform 0.15s ease, outline-color 0.15s ease, background-color 0.15s ease;
+  font-variant-numeric: tabular-nums;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  background: var(--bg);
+}
+
+.turn-scrubber-link:hover {
+  background: var(--border);
+}
+
+.turn-scrubber-link:focus-visible {
+  outline-color: var(--accent-light);
+}
+
+.turn-scrubber-link.active-turn {
+  transform: scale(1.08);
+  outline-color: var(--accent-light);
+}
+${roleStyles}${progressStyles}`;
+}
+
+function scripts(navigation?: NavigationConfig): string {
   return `
 (function() {
   const toggle = document.getElementById('theme-toggle');
@@ -1069,7 +1252,80 @@ function scripts(): string {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   });
-})();
+
+${navigation ? scrubberScripts(navigation) : ''}})();
+`;
+}
+
+function scrubberScripts(navigation: NavigationConfig): string {
+  const progressBar = navigation.progressBar ?? true;
+  const progressInit = progressBar
+    ? "const progress = document.getElementById('turn-scrubber-progress');"
+    : "";
+  const progressUpdate = progressBar
+    ? "if (progress) { progress.style.width = ((activeIndex + 1) / total * 100) + '%'; }"
+    : "";
+
+  return `
+  const scrubber = document.querySelector('.turn-scrubber');
+  if (scrubber) {
+    const turnArticles = document.querySelectorAll('.turn');
+    const scrubberLinks = document.querySelectorAll('.turn-scrubber-link');
+    ${progressInit}
+    const total = turnArticles.length;
+
+    if (total > 0 && scrubberLinks.length === total) {
+      const intersecting = new Array(total).fill(false);
+      const header = document.querySelector('.site-header');
+      const barHeight = scrubber.offsetHeight;
+      const headerHeight = header ? header.offsetHeight : 0;
+      const activeZoneHeight = Math.min(200, window.innerHeight * 0.25);
+      const bottomMargin = Math.max(
+        0,
+        window.innerHeight - headerHeight - barHeight - activeZoneHeight,
+      );
+      const rootMargin = '-' + (headerHeight + 8) + 'px 0px -' + bottomMargin + 'px 0px';
+
+      function updateActive() {
+        const activeIndex = intersecting.findIndex(Boolean);
+        if (activeIndex === -1) return;
+
+        scrubberLinks.forEach((link, i) => {
+          const isActive = i === activeIndex;
+          link.classList.toggle('active-turn', isActive);
+          if (isActive) {
+            link.setAttribute('aria-current', 'true');
+            link.scrollIntoView({
+              behavior: 'smooth',
+              block: 'nearest',
+              inline: 'center',
+            });
+          } else {
+            link.removeAttribute('aria-current');
+          }
+        });
+
+        ${progressUpdate}
+      }
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const turnIndex = Number(entry.target.getAttribute('id')?.replace('turn-', ''));
+            if (!Number.isNaN(turnIndex) && turnIndex >= 0 && turnIndex < total) {
+              intersecting[turnIndex] = entry.isIntersecting;
+            }
+          });
+          updateActive();
+        },
+        { rootMargin, threshold: 0 },
+      );
+
+      turnArticles.forEach((turn) => observer.observe(turn));
+      intersecting[0] = true;
+      updateActive();
+    }
+  }
 `;
 }
 
@@ -1140,7 +1396,7 @@ export async function renderFile(
     }
   }
 
-  const html = buildPage(meta, turns, username);
+  const html = buildPage(meta, turns, username, options.navigation);
   const outputPath = options.outputPath
     ? path.resolve(options.outputPath)
     : resolveOutputPath(resolved);

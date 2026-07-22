@@ -192,6 +192,7 @@ async function main(): Promise<void> {
       outputPath,
       summarize: summarizeOptions,
       username: config.username,
+      navigation: config.navigation,
     });
     return;
   }
@@ -200,6 +201,7 @@ async function main(): Promise<void> {
     sanitize,
     summarize: summarizeOptions,
     username: config.username,
+    navigation: config.navigation,
   });
 }
 
