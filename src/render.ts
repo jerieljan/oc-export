@@ -24,6 +24,7 @@ export interface RenderOptions {
   sanitize?: boolean;
   outputPath?: string;
   summarize?: SummarizeOptions;
+  username?: string;
 }
 
 function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
@@ -172,7 +173,7 @@ function renderStats(meta: SessionMeta): string {
 </section>`;
 }
 
-function buildPage(meta: SessionMeta, turns: Turn[]): string {
+function buildPage(meta: SessionMeta, turns: Turn[], username?: string): string {
   const title = escapeHtml(meta.title);
   const created = meta.created ?? formatTimestamp(meta.stats?.createdMs);
   const createdIso = formatTimestampIsoWithTimezone(meta.stats?.createdMs);
@@ -188,7 +189,7 @@ function buildPage(meta: SessionMeta, turns: Turn[]): string {
   const turnHtml = turns
     .map((turn, index) => {
       if (turn.role === "user") {
-        return renderUserTurn(turn, index);
+        return renderUserTurn(turn, index, username);
       }
       return renderAssistantTurn(turn, index);
     })
@@ -236,7 +237,7 @@ ${scripts()}
 </html>`;
 }
 
-function renderUserTurn(turn: Turn, index: number): string {
+function renderUserTurn(turn: Turn, index: number, username?: string): string {
   const messageBlock = turn.content.trim()
     ? `<div class="message user-message">\n    ${md.render(turn.content)}\n  </div>`
     : "";
@@ -256,10 +257,12 @@ function renderUserTurn(turn: Turn, index: number): string {
 </details>`;
   }
 
+  const badgeLabel = escapeHtml(username ?? "User");
+
   return `
 <article class="turn user-turn" id="turn-${index}">
   <div class="turn-header">
-    <div class="turn-badge user-badge">User</div>
+    <div class="turn-badge user-badge">${badgeLabel}</div>
   </div>
   ${messageBlock}
   ${syntheticBlock}
@@ -1059,7 +1062,7 @@ export async function renderFile(
   inputPath: string,
   options: RenderOptions = {},
 ): Promise<string> {
-  const { sanitize = true, summarize } = options;
+  const { sanitize = true, summarize, username } = options;
   const resolved = path.resolve(inputPath);
   if (!fs.existsSync(resolved)) {
     const display = sanitize ? sanitizePathForDisplay(resolved) : resolved;
@@ -1098,7 +1101,7 @@ export async function renderFile(
     }
   }
 
-  const html = buildPage(meta, turns);
+  const html = buildPage(meta, turns, username);
   const outputPath = options.outputPath
     ? path.resolve(options.outputPath)
     : resolveOutputPath(resolved);

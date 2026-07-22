@@ -191,11 +191,16 @@ async function main(): Promise<void> {
       sanitize,
       outputPath,
       summarize: summarizeOptions,
+      username: config.username,
     });
     return;
   }
 
-  await renderFiles(args.files, { sanitize, summarize: summarizeOptions });
+  await renderFiles(args.files, {
+    sanitize,
+    summarize: summarizeOptions,
+    username: config.username,
+  });
 }
 
 main().catch((err) => {

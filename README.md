@@ -171,6 +171,7 @@ oc-export --config ~/.oc-export.jsonc session.json
 | --- | --- | --- | --- |
 | `raw` | boolean | `false` | Skip sanitization by default |
 | `extractor` | string | `opencode` | Default session source: `opencode` or `claude` |
+| `username` | string | — | Display name used on the user-turn badge, rendered in uppercase |
 | `picker.databasePath` | string | `~/.local/share/opencode/opencode.db` | Path to the Opencode SQLite database |
 | `picker.limit` | number | `20` | Number of recent sessions shown in the interactive picker |
 | `claude.projectsPath` | string | `~/.claude/projects` | Path to the Claude Code projects directory |

@@ -66,7 +66,12 @@ export async function exportAndRenderSession(
   await source.exportSessionToFile(id, jsonPath, { config });
 
   console.log(`Rendering → ${displayHtml}`);
-  await renderFile(jsonPath, { sanitize, outputPath: htmlPath, summarize });
+  await renderFile(jsonPath, {
+    sanitize,
+    outputPath: htmlPath,
+    summarize,
+    username: config.username,
+  });
 
   console.log(`Done: ${displayJson} → ${displayHtml}`);
 }

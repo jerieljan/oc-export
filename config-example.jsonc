@@ -15,6 +15,10 @@
   // Can be overridden with --extractor on the command line.
   "extractor": "opencode",
 
+  // Display name used on the user-turn badge in exported HTML. When set,
+  // the badge text is rendered in uppercase via CSS.
+  // "username": "John Doe",
+
   // Options for the interactive session picker and --session lookups.
   "picker": {
     // Path to the local Opencode SQLite database. The ~ prefix is expanded

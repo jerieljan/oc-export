@@ -30,6 +30,7 @@ export interface SummarizeConfig {
 export interface UserConfig {
   raw?: boolean;
   extractor?: string;
+  username?: string;
   picker?: Partial<PickerConfig>;
   claude?: Partial<ClaudeConfig>;
   summarize?: SummarizeConfig;
@@ -38,6 +39,7 @@ export interface UserConfig {
 export interface ResolvedConfig {
   raw: boolean;
   extractor: string;
+  username?: string;
   picker: PickerConfig;
   claude: ClaudeConfig;
   summarize?: SummarizeConfig;
@@ -100,6 +102,7 @@ function validatePositiveNumber(
 function validateUserConfig(config: UserConfig): ResolvedConfig {
   validateBoolean(config.raw, "raw");
   validateString(config.extractor, "extractor");
+  validateString(config.username, "username");
 
   if (config.picker !== undefined && typeof config.picker !== "object") {
     throw new Error('Config error: "picker" must be an object');
@@ -131,6 +134,7 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
   return {
     raw: config.raw ?? DEFAULT_CONFIG.raw,
     extractor: config.extractor ?? DEFAULT_CONFIG.extractor,
+    username: config.username,
     picker: {
       databasePath: config.picker?.databasePath
         ? expandHomeDir(config.picker.databasePath)
