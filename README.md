@@ -182,6 +182,8 @@ oc-export --config ~/.oc-export.jsonc session.json
 | `summarize.prompt` | string | — | Custom system prompt used for both block types |
 | `summarize.thinkingPrompt` | string | — | Custom system prompt for thinking summaries |
 | `summarize.toolsPrompt` | string | — | Custom system prompt for tool-call summaries |
+| `summarize.sessionSummary.enabled` | boolean | `false` | Generate a top-level session summary after per-turn summaries |
+| `summarize.sessionSummary.prompt` | string | — | Custom system prompt for the session summary |
 
 ## Summarization
 
@@ -207,6 +209,8 @@ oc-export session.json --summarize
 Set `summarize.always` to `true` to summarize by default without passing `--summarize`.
 
 You can override the prompts with `summarize.prompt` (applies to both block types) or with `summarize.thinkingPrompt` and `summarize.toolsPrompt` for independent control. The type-specific prompts take precedence over `prompt`.
+
+Set `summarize.sessionSummary.enabled` to `true` to add a top-level "Session summary" panel at the start of the HTML. This summary runs after all per-turn summaries are complete, so it summarizes the existing summaries instead of the full tool and thinking traces. You can override its prompt with `summarize.sessionSummary.prompt`.
 
 Sanitization runs before summarization, so the model only sees redacted content. The model ID cannot be supplied via the CLI.
 

@@ -59,6 +59,15 @@
 
     // Optional custom prompt for tool-call summaries. Takes precedence over prompt.
     // "toolsPrompt": "..."
+
+    // Optional session-wide summary. When enabled, a "Session summary" panel is
+    // added at the top of the HTML after all per-turn summaries are complete.
+    "sessionSummary": {
+      "enabled": false
+
+      // Optional custom prompt for the session summary.
+      // "prompt": "..."
+    }
   },
 
   // Navigation bar shown at the bottom of exported HTML pages. It shows a

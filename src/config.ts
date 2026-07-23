@@ -18,6 +18,11 @@ export interface ClaudeConfig {
   limit: number;
 }
 
+export interface SessionSummaryConfig {
+  enabled?: boolean;
+  prompt?: string;
+}
+
 export interface SummarizeConfig {
   enabled: boolean;
   model?: string;
@@ -25,6 +30,7 @@ export interface SummarizeConfig {
   prompt?: string;
   thinkingPrompt?: string;
   toolsPrompt?: string;
+  sessionSummary?: SessionSummaryConfig;
 }
 
 export interface NavigationConfig {
@@ -150,6 +156,15 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
     validateString(config.summarize.prompt, "summarize.prompt");
     validateString(config.summarize.thinkingPrompt, "summarize.thinkingPrompt");
     validateString(config.summarize.toolsPrompt, "summarize.toolsPrompt");
+
+    if (config.summarize.sessionSummary !== undefined && typeof config.summarize.sessionSummary !== "object") {
+      throw new Error('Config error: "summarize.sessionSummary" must be an object');
+    }
+
+    if (config.summarize.sessionSummary) {
+      validateBoolean(config.summarize.sessionSummary.enabled, "summarize.sessionSummary.enabled");
+      validateString(config.summarize.sessionSummary.prompt, "summarize.sessionSummary.prompt");
+    }
   }
 
   if (config.navigation !== undefined && typeof config.navigation !== "object") {

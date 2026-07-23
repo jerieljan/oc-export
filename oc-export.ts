@@ -144,12 +144,17 @@ async function main(): Promise<void> {
     }
   }
 
+  const doSessionSummary =
+    doSummarize && config.summarize?.sessionSummary?.enabled === true;
+
   const summarizeOptions = doSummarize
     ? {
         model: config.summarize!.model!,
         prompt: config.summarize!.prompt,
         thinkingPrompt: config.summarize!.thinkingPrompt,
         toolsPrompt: config.summarize!.toolsPrompt,
+        sessionSummary: doSessionSummary,
+        sessionSummaryPrompt: config.summarize!.sessionSummary?.prompt,
       }
     : undefined;
 

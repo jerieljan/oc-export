@@ -6,6 +6,7 @@ export interface SessionMeta {
   created?: string;
   updated?: string;
   stats?: SessionStats;
+  sessionSummary?: string;
 }
 
 export interface SessionStats {

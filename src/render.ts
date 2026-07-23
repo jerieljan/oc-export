@@ -3,7 +3,7 @@ import path from "node:path";
 import MarkdownIt from "markdown-it";
 import { sanitizePathForDisplay, sanitizeText } from "./sanitize.ts";
 import { extractSession } from "./extractors/index.ts";
-import { summarizeTurns, type SummarizeOptions } from "./summarize.ts";
+import { summarizeSession, summarizeTurns, type SummarizeOptions } from "./summarize.ts";
 import type { NavigationConfig } from "./config.ts";
 import {
   formatCost,
@@ -34,6 +34,9 @@ function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
   meta.sessionId = meta.sessionId ? sanitizeText(meta.sessionId) : undefined;
   meta.created = meta.created ? sanitizeText(meta.created) : undefined;
   meta.updated = meta.updated ? sanitizeText(meta.updated) : undefined;
+  meta.sessionSummary = meta.sessionSummary
+    ? sanitizeText(meta.sessionSummary)
+    : undefined;
 
   for (const turn of turns) {
     turn.content = sanitizeText(turn.content);
@@ -175,6 +178,15 @@ function renderStats(meta: SessionMeta): string {
 </section>`;
 }
 
+function renderSessionSummary(summary: string): string {
+  return `<section class="container session-summary">
+  <h2 class="session-summary-heading">Session summary</h2>
+  <div class="session-summary-body">
+    ${md.render(summary)}
+  </div>
+</section>`;
+}
+
 function renderTurnScrubber(
   turns: Turn[],
   navigation?: NavigationConfig,
@@ -241,6 +253,9 @@ function buildPage(
     .join("\n");
 
   const statsHtml = renderStats(meta);
+  const sessionSummaryHtml = meta.sessionSummary
+    ? renderSessionSummary(meta.sessionSummary)
+    : "";
   const navConfig = {
     enabled: navigation?.enabled ?? true,
     minTurns: navigation?.minTurns ?? 0,
@@ -288,6 +303,7 @@ ${styles(activeNav)}
     </div>
   </div>
 </header>
+${sessionSummaryHtml}
 <main class="container chat">
 ${turnHtml}
 </main>
@@ -734,7 +750,8 @@ html.dark .theme-icon-light {
   font-size: 0.95rem;
 }
 
-.session-stats {
+.session-stats,
+.session-summary {
   background: var(--bg);
   border: 1px dashed var(--border-strong);
   border-radius: 0.5rem;
@@ -743,7 +760,12 @@ html.dark .theme-icon-light {
   margin-bottom: 4rem;
 }
 
-.session-stats-heading {
+.session-summary {
+  margin-top: 2rem;
+}
+
+.session-stats-heading,
+.session-summary-heading {
   margin: 0 0 1rem;
   font-family: var(--font-heading);
   font-size: 0.85rem;
@@ -751,6 +773,25 @@ html.dark .theme-icon-light {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.session-summary-body {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.session-summary-body p,
+.session-summary-body ul,
+.session-summary-body ol {
+  margin: 0.75rem 0;
+}
+
+.session-summary-body > *:first-child {
+  margin-top: 0;
+}
+
+.session-summary-body > *:last-child {
+  margin-bottom: 0;
 }
 
 .session-id {
@@ -1392,6 +1433,14 @@ export async function renderFile(
             turn.toolsSummary = sanitizeText(turn.toolsSummary);
           }
         }
+      }
+    }
+
+    if (summarize.sessionSummary) {
+      console.log("Summarizing entire session with llm...");
+      meta.sessionSummary = await summarizeSession(turns, summarize);
+      if (sanitize && meta.sessionSummary) {
+        meta.sessionSummary = sanitizeText(meta.sessionSummary);
       }
     }
   }
