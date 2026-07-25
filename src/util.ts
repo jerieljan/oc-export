@@ -43,35 +43,51 @@ export function spawnToFile(
   }
 
   return new Promise((resolve, reject) => {
-    const out = fs.createWriteStream(outputPath);
+    const dir = path.dirname(outputPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    // Write the child process's stdout directly to a file descriptor.
+    // Piping stdout into a Writable stream can truncate output when the
+    // child calls process.exit(0) immediately after writing, because the
+    // in-process stream buffer (default 64 KB) may not have drained into
+    // the pipe. A real file descriptor is flushed by the OS on exit.
+    const fd = fs.openSync(outputPath, "w");
+
     const proc = spawn(command[0]!, command.slice(1), {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["ignore", fd, "pipe"],
     });
 
-    proc.stdout.pipe(out);
-
     let stderr = "";
-    proc.stderr.on("data", (data: Buffer) => {
+    proc.stderr!.on("data", (data: Buffer) => {
       stderr += data.toString("utf-8");
     });
 
+    function cleanupFd(): void {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // ignore close errors
+      }
+    }
+
     proc.on("error", (err: Error) => {
-      out.destroy();
+      cleanupFd();
       reject(err);
     });
 
     proc.on("close", (code: number | null) => {
-      out.end(() => {
-        if (code !== 0) {
-          reject(
-            new Error(
-              `${command[0]} failed (exit ${code}):\n${stderr || "no output"}`,
-            ),
-          );
-        } else {
-          resolve(outputPath);
-        }
-      });
+      cleanupFd();
+      if (code !== 0) {
+        reject(
+          new Error(
+            `${command[0]} failed (exit ${code}):\n${stderr || "no output"}`,
+          ),
+        );
+      } else {
+        resolve(outputPath);
+      }
     });
   });
 }

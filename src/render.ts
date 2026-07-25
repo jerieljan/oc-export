@@ -1378,17 +1378,52 @@ function resolveOutputPath(inputPath: string): string {
 
 function parseInputFile(resolved: string): unknown {
   const text = fs.readFileSync(resolved, "utf-8");
+  const trimmedText = text.trim();
+  if (!trimmedText) {
+    throw new Error(`Input file is empty: ${resolved}`);
+  }
 
   // Some exporters (e.g. opencode) write pretty-printed JSON to a .jsonl
-  // extension. Try a single JSON parse first, then fall back to line-by-line.
+  // extension. Try a single JSON parse first.
   try {
     return JSON.parse(text);
-  } catch {
+  } catch (err) {
+    const firstNonEmpty = trimmedText.split("\n", 1)[0]!.trim();
+
+    // If the first non-empty line is a bare "{" or "[", this is almost certainly
+    // a pretty-printed single JSON object/array rather than JSONL. A JSONL file
+    // would have a complete JSON value on its first line. Falling back to line-by-line
+    // parsing would turn the first line into a confusing "Expected property name or '}'"
+    // error and hide the real parse failure.
+    let firstLineIsSingleJson = false;
+    if (firstNonEmpty === "{" || firstNonEmpty === "[") {
+      try {
+        JSON.parse(firstNonEmpty);
+      } catch {
+        firstLineIsSingleJson = true;
+      }
+    }
+
+    if (firstLineIsSingleJson) {
+      throw new Error(
+        `Failed to parse ${resolved} as a single JSON document: ${(err as Error).message}`,
+      );
+    }
+
+    // Otherwise, treat the file as JSONL (one JSON value per line).
     const messages: unknown[] = [];
+    let lineNumber = 0;
     for (const line of text.split("\n")) {
+      lineNumber++;
       const trimmed = line.trim();
       if (!trimmed) continue;
-      messages.push(JSON.parse(trimmed));
+      try {
+        messages.push(JSON.parse(trimmed));
+      } catch (lineErr) {
+        throw new Error(
+          `Failed to parse JSONL line ${lineNumber} in ${resolved}: ${(lineErr as Error).message}`,
+        );
+      }
     }
     return messages;
   }
