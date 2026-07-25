@@ -1,14 +1,67 @@
 # oc-export
 
-Export and render chat sessions to standalone HTML files.
+oc-export allows you to export and render chat sessions to standalone HTML files.
+This project was built primarily with OpenCode in mind, but also planning to support other formats.
 
-## Description
+## Why?
 
-`oc-export` is a CLI tool that turns chat-session JSON exports into self-contained HTML files. It supports Opencode exports out of the box and can be extended with additional extractors for other formats. It can read existing JSON exports, export sessions directly from the local Opencode database, or present an interactive picker.
+`opencode` already supports export, either via `/export` or `opencode export`. 
 
-## Supported formats
+oc-export makes use of this, and does the following:
 
-- **Opencode JSON exports** (primary format)
+- it exports them additionally in HTML that's meant to be shared standalone.
+- it also lets you point to a manual export file and produce similar HTML files.
+- the picker operates a bit differently; it just shows recent sessions overall, not just the current directory.
+- you have a bit more control over the configuration section.
+
+This project was built with the HTML export in mind. My pain point was that I always want to share
+sessions with others and sure, I can just use the built-in functions for these, but I want portable HTML files for sharing manually or on a drop service like [Cloudflare Drop](https://www.cloudflare.com/drop/).
+
+Each HTML file has CSS and JavaScript embedded inline; fonts are loaded from Google Fonts.
+
+*The HTML export has these capabilities:*
+
+- you can choose to have thinking and tool calls summarized
+- you can have a summary at the top
+- a navigation scrubber that runs horizontally, rather than vertically, like a book reader
+- basic sanitization of data and file paths
+- it works adequately on mobile (work in progress, it's not that great yet)
+
+These options are configured either via flags or the config.jsonc file. See the configuration section for more information.
+
+## Quick Start
+
+### Requirements
+
+- Have a *working bun setup* 
+- The `opencode` CLI must be installed and on PATH for `--session` and interactive picker modes.
+- When using the Claude Code extractor, this project reads `~/.claude/projects` directly.
+- When using summarization, the `llm` CLI must be installed.
+
+### Instructions
+
+- Clone this repository
+- `bun install` to set up dependencies.
+- Use `bun run oc-export` to run locally. Use `bun link` so you can invoke oc-export anywhere.
+
+While running oc-export:
+
+- If you have OpenCode present, it will show you your recent sessions and export both the JSON and HTML result.
+- If you have a file, you can provide it with oc-export <file> and it'll produce the HTML equivalent.
+
+Some of the common flags you can use:
+
+- `--session <id>` - if you already know the session ID to export, this does it directly. Helpful for scripts and agents.
+- `--raw` - if you don't want sanitization (which operates by default), pass this to produce what the sources provide.
+- `--summarize` - if you have `llm` configured, this triggers summarization. **Requires setup**, so check the Summarization section below.
+
+Scroll down to the Usage section if you want to know more.
+
+## Supported Formats
+
+These are the supported formats. This is a work in progress.
+
+- **OpenCode JSON exports** (primary format)
 - **Claude Code JSONL exports** (experimental)
 - **Kagi Assistant JSON exports**
 - **Open WebUI JSON exports**
@@ -19,38 +72,15 @@ Claude Code sessions are read directly from `~/.claude/projects`. Subagent conve
 
 Additional formats can be added by implementing an extractor in `src/extractors/` and registering it in `src/extractors/index.ts`.
 
-## Installation
+## AI-generated Disclosure
 
-Install dependencies with Bun:
-
-```bash
-bun install
-```
-
-To make `oc-export` available globally while keeping the TypeScript source editable:
-
-```bash
-bun link
-# Then in any directory:
-bun link oc-export
-oc-export --help
-```
-
-Alternatively, install globally from the local path:
-
-```bash
-bun install -g /path/to/oc-export
-```
-
-## Fish completions
-
-A Fish completions file is included in `completions/oc-export.fish`. Copy it to your Fish completions directory:
-
-```bash
-cp completions/oc-export.fish ~/.config/fish/completions/
-```
+This project started as a personal tool, so most of the application code is AI-generated, but highly steered and reviewed by a human.
 
 ## Usage
+
+If you have the project installed globally, here are the commands that you can execute:
+
+TIP: If you're using the fish shell, a completions file is available in `completions/oc-export.fish`. Place it on your fish completions directory.
 
 Run the interactive picker to choose a recent session:
 
@@ -58,18 +88,21 @@ Run the interactive picker to choose a recent session:
 oc-export
 ```
 
-Use Claude Code sessions instead of Opencode:
+Use Claude Code sessions instead of OpenCode:
 
 ```bash
 oc-export --extractor claude
+# Produces: session-id.jsonl, session-id.html
+
 oc-export --extractor claude --output report
+# Produces: report.jsonl, report.html
 ```
 
 Pick a session and write both files with custom names:
 
 ```bash
 oc-export --output report
-# Produces: report.json, report.html
+# Produces: report.jsonl, report.html
 ```
 
 Render an existing JSON export:
@@ -83,12 +116,6 @@ Render with a custom output filename:
 ```bash
 oc-export session.json --output report
 # Produces: report.html
-```
-
-Render multiple JSON exports:
-
-```bash
-oc-export a.json b.json
 ```
 
 Export a session by full ID or last 8 characters:
@@ -125,9 +152,11 @@ bun run dev
 bun run dev --session abc123
 ```
 
-## Configuration file
+## Configuration
 
-`oc-export` reads settings from `~/.config/oc-export/config.jsonc` if the file exists. The file is JSONC, so comments are allowed. Missing files are ignored. Malformed files are fatal errors with a clear message.
+`oc-export` reads settings from `~/.config/oc-export/config.jsonc` if the file exists. 
+
+The file is JSONC, so comments are allowed. Missing files are ignored. Malformed files are fatal errors with a clear message.
 
 CLI flags always override config values. Config values override built-in defaults.
 
@@ -165,14 +194,14 @@ Use a custom config file:
 oc-export --config ~/.oc-export.jsonc session.json
 ```
 
-### Supported options
+### Supported Options
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `raw` | boolean | `false` | Skip sanitization by default |
 | `extractor` | string | `opencode` | Default session source: `opencode` or `claude` |
 | `username` | string | — | Display name used on the user-turn badge, rendered in uppercase |
-| `picker.databasePath` | string | `~/.local/share/opencode/opencode.db` | Path to the Opencode SQLite database |
+| `picker.databasePath` | string | `~/.local/share/opencode/opencode.db` | Path to the OpenCode SQLite database |
 | `picker.limit` | number | `20` | Number of recent sessions shown in the interactive picker |
 | `claude.projectsPath` | string | `~/.claude/projects` | Path to the Claude Code projects directory |
 | `claude.limit` | number | `50` | Number of recent Claude sessions shown in the interactive picker |
@@ -184,12 +213,20 @@ oc-export --config ~/.oc-export.jsonc session.json
 | `summarize.toolsPrompt` | string | — | Custom system prompt for tool-call summaries |
 | `summarize.sessionSummary.enabled` | boolean | `false` | Generate a top-level session summary after per-turn summaries |
 | `summarize.sessionSummary.prompt` | string | — | Custom system prompt for the session summary |
+| `navigation.enabled` | boolean | `true` | Show the bottom turn navigation bar |
+| `navigation.minTurns` | number | `0` | Only show the bar when the session has at least this many turns |
+| `navigation.progressBar` | boolean | `true` | Show a thin progress line at the top of the bar |
+| `navigation.roleColor` | boolean | `true` | Color pills by role: darker for user turns, lighter for assistant turns |
 
 ## Summarization
 
-When summarization is enabled, `oc-export` replaces collapsible thinking and tool-call blocks in assistant turns with concise summaries. This produces a shorter HTML file that is easier to skim.
+When summarization is enabled, `oc-export` replaces collapsible thinking and tool-call blocks in assistant turns with concise summaries. 
 
-Summarization relies on Simon Willison's [`llm`](https://llm.datasette.io/) CLI. You must have it installed and on PATH, and you must configure a model ID in `~/.config/oc-export/config.jsonc`:
+This produces a shorter HTML file that is easier to skim, and to some degree helps avoid sharing raw details with others if sanitization fails.
+
+**Summarization relies on Simon Willison's [`llm`](https://llm.datasette.io/) CLI.**
+
+**You must have it installed and on PATH, and you must configure a model ID in `~/.config/oc-export/config.jsonc`**.
 
 ```jsonc
 {
@@ -212,22 +249,13 @@ You can override the prompts with `summarize.prompt` (applies to both block type
 
 Set `summarize.sessionSummary.enabled` to `true` to add a top-level "Session summary" panel at the start of the HTML. This summary runs after all per-turn summaries are complete, so it summarizes the existing summaries instead of the full tool and thinking traces. You can override its prompt with `summarize.sessionSummary.prompt`.
 
-Sanitization runs before summarization, so the model only sees redacted content. The model ID cannot be supplied via the CLI.
+*Sanitization runs before summarization, so the model only sees redacted content.* The model ID cannot be supplied via the CLI.
 
 ## Sanitization
 
-Sanitization is enabled by default. It redacts common PII (names, emails, phones, credit cards, SSNs) using `@redactpii/node` and replaces absolute file paths with relative paths or `~` references. Use `--raw` to disable it, or `--no-raw` to re-enable it when `raw: true` is set in the config.
+Sanitization is enabled by default. It redacts common PII (names, emails, phones, credit cards, SSNs) using `@redactpii/node` and replaces absolute file paths with relative paths or `~` references.
+
+Use `--raw` to disable it, or `--no-raw` to re-enable it when `raw: true` is set in the config.
 
 - Name detection is regex/greeting-based, so not every name will be caught.
 - Paths with spaces or inside URLs are handled conservatively; local `file://` paths are still sanitized.
-
-## Requirements
-
-- Bun
-- The `opencode` CLI must be installed and on PATH for `--session` and interactive picker modes when using the `opencode` extractor.
-- The Claude Code extractor reads `~/.claude/projects` directly; no additional CLI is required.
-- The `llm` CLI must be installed and on PATH to use `--summarize`.
-
-## Generated output
-
-Each HTML file is fully self-contained: all CSS and JavaScript are embedded inline, so no external network requests are required to view it.
