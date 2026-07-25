@@ -1,6 +1,6 @@
-import type { Extractor } from "./types.ts";
-import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.ts";
-import { formatTimestamp } from "../format.ts";
+import type { Extractor } from "./types.js";
+import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
+import { formatTimestamp } from "../format.js";
 
 // JSON export format produced by Open WebUI.
 // The export file is a JSON array of chat objects; we process the first one.

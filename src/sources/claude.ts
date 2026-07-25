@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import type { SessionRow, Source, SourceOptions } from "./types.ts";
+import type { SessionRow, Source, SourceOptions } from "./types.js";
 
 const DEFAULT_PROJECTS_PATH = path.join(os.homedir(), ".claude/projects");
 

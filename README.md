@@ -33,12 +33,27 @@ These options are configured either via flags or the config.jsonc file. See the 
 
 ### Requirements
 
-- Have a *working bun setup* 
+- Node 18+ **or** a working Bun setup.
 - The `opencode` CLI must be installed and on PATH for `--session` and interactive picker modes.
 - When using the Claude Code extractor, this project reads `~/.claude/projects` directly.
 - When using summarization, the `llm` CLI must be installed.
 
 ### Instructions
+
+#### From npm (recommended for end users)
+
+```bash
+npm install -g oc-export
+oc-export --help
+```
+
+Or run without installing:
+
+```bash
+npx oc-export --help
+```
+
+#### From source (for development)
 
 - Clone this repository
 - `bun install` to set up dependencies.

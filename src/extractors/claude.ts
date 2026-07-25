@@ -1,6 +1,6 @@
-import type { Extractor } from "./types.ts";
-import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.ts";
-import { formatTimestamp } from "../format.ts";
+import type { Extractor } from "./types.js";
+import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
+import { formatTimestamp } from "../format.js";
 
 // Claude Code JSONL message format.
 // The source layer normalizes the raw JSONL (inlines subagents, resolves

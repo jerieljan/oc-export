@@ -1,4 +1,4 @@
-import type { ResolvedConfig } from "../config.ts";
+import type { ResolvedConfig } from "../config.js";
 
 // A row returned by any session source for the interactive picker and
 // --session lookups.

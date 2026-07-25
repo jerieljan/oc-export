@@ -1,18 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import MarkdownIt from "markdown-it";
-import { sanitizePathForDisplay, sanitizeText } from "./sanitize.ts";
-import { extractSession } from "./extractors/index.ts";
-import { summarizeSession, summarizeTurns, type SummarizeOptions } from "./summarize.ts";
-import type { NavigationConfig } from "./config.ts";
+import { sanitizePathForDisplay, sanitizeText } from "./sanitize.js";
+import { extractSession } from "./extractors/index.js";
+import { summarizeSession, summarizeTurns, type SummarizeOptions } from "./summarize.js";
+import type { NavigationConfig } from "./config.js";
 import {
   formatCost,
   formatDuration,
   formatTimestamp,
   formatTimestampIsoWithTimezone,
   formatTokens,
-} from "./format.ts";
-import type { Reference, SessionMeta, SessionStats, Turn } from "./types.ts";
+} from "./format.js";
+import type { Reference, SessionMeta, SessionStats, Turn } from "./types.js";
 
 const md = new MarkdownIt({
   html: false,

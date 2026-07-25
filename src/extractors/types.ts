@@ -1,4 +1,4 @@
-import type { SessionMeta, Turn } from "../types.ts";
+import type { SessionMeta, Turn } from "../types.js";
 
 // An extractor converts a raw JSON blob into the canonical session model.
 // Register additional extractors in src/extractors/index.ts to support new

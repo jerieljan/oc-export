@@ -1,11 +1,11 @@
 import path from "node:path";
 import fs from "node:fs";
 import readline from "node:readline/promises";
-import { DEFAULT_CONFIG, type ResolvedConfig } from "./config.ts";
-import { sanitizePathForDisplay } from "./sanitize.ts";
-import { renderFile } from "./render.ts";
-import { getSource, type Source } from "./sources/index.ts";
-import type { SummarizeOptions } from "./summarize.ts";
+import { DEFAULT_CONFIG, type ResolvedConfig } from "./config.js";
+import { sanitizePathForDisplay } from "./sanitize.js";
+import { renderFile } from "./render.js";
+import { getSource, type Source } from "./sources/index.js";
+import type { SummarizeOptions } from "./summarize.js";
 
 export interface PickOptions {
   sanitize?: boolean;

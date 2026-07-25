@@ -1,9 +1,9 @@
-import type { SessionMeta, Turn } from "../types.ts";
-import type { Extractor } from "./types.ts";
-import { kagiExtractor } from "./kagi.ts";
-import { claudeExtractor } from "./claude.ts";
-import { opencodeExtractor } from "./opencode.ts";
-import { openWebUIExtractor } from "./openwebui.ts";
+import type { SessionMeta, Turn } from "../types.js";
+import type { Extractor } from "./types.js";
+import { kagiExtractor } from "./kagi.js";
+import { claudeExtractor } from "./claude.js";
+import { opencodeExtractor } from "./opencode.js";
+import { openWebUIExtractor } from "./openwebui.js";
 
 const extractors: Extractor[] = [
   openWebUIExtractor,

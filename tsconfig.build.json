@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "allowImportingTsExtensions": false,
+    "types": ["node", "bun", "markdown-it"],
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": false,
+    "outDir": "./dist",
+    "rootDir": "."
+  },
+  "include": ["oc-export.ts", "src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

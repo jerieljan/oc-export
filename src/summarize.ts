@@ -1,4 +1,5 @@
-import type { ToolCall, Turn } from "./types.ts";
+import { spawnWithStdin, which } from "./util.js";
+import type { ToolCall, Turn } from "./types.js";
 
 export interface SummarizeOptions {
   model: string;
@@ -88,25 +89,17 @@ async function callLlm(
   systemPrompt: string,
   content: string,
 ): Promise<string> {
-  if (!Bun.which("llm")) {
+  if (!which("llm")) {
     throw new Error(
       "The `llm` CLI is not installed or not on PATH. " +
         "Install it (https://llm.datasette.io/) or omit --summarize.",
     );
   }
 
-  const proc = Bun.spawn({
-    cmd: ["llm", "-m", model, "-s", systemPrompt, "--no-log"],
-    stdin: Buffer.from(content, "utf-8"),
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
+  const { stdout, stderr, exitCode } = await spawnWithStdin(
+    ["llm", "-m", model, "-s", systemPrompt, "--no-log"],
+    Buffer.from(content, "utf-8"),
+  );
 
   if (exitCode !== 0) {
     const detail = stderr.trim() || "no output";

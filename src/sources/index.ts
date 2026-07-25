@@ -1,6 +1,6 @@
-import type { Source } from "./types.ts";
-import { claudeSource } from "./claude.ts";
-import { opencodeSource } from "./opencode.ts";
+import type { Source } from "./types.js";
+import { claudeSource } from "./claude.js";
+import { opencodeSource } from "./opencode.js";
 
 const sources: Source[] = [opencodeSource, claudeSource];
 
@@ -24,4 +24,4 @@ export function getSource(name: string): Source {
 }
 
 export { opencodeSource, claudeSource };
-export type { Source, SourceOptions } from "./types.ts";
+export type { Source, SourceOptions } from "./types.js";

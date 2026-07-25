@@ -1,6 +1,6 @@
-import type { Extractor } from "./types.ts";
-import type { Reference, SessionMeta, SessionStats, Turn } from "../types.ts";
-import { formatTimestamp, parseTimestamp } from "../format.ts";
+import type { Extractor } from "./types.js";
+import type { Reference, SessionMeta, SessionStats, Turn } from "../types.js";
+import { formatTimestamp, parseTimestamp } from "../format.js";
 
 // JSON export format produced by Kagi Assistant.
 interface KagiSession {

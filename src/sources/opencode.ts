@@ -1,8 +1,8 @@
-import { Database } from "bun:sqlite";
 import path from "node:path";
 import fs from "node:fs";
-import Bun from "bun";
-import type { SessionRow, Source, SourceOptions } from "./types.ts";
+import { openDatabase } from "../db.js";
+import { spawnToFile } from "../util.js";
+import type { SessionRow, Source, SourceOptions } from "./types.js";
 
 function last8(id: string): string {
   return id.slice(-8);
@@ -12,7 +12,7 @@ export function getDatabasePath(options: SourceOptions): string {
   return options.config.picker.databasePath;
 }
 
-export function listSessions(options: SourceOptions): SessionRow[] {
+export async function listSessions(options: SourceOptions): Promise<SessionRow[]> {
   const dbPath = getDatabasePath(options);
   const limit = options.config.picker.limit;
 
@@ -20,10 +20,10 @@ export function listSessions(options: SourceOptions): SessionRow[] {
     throw new Error(`Opencode database not found: ${dbPath}`);
   }
 
-  const db = new Database(dbPath, { readonly: true, create: false });
+  const db = await openDatabase(dbPath);
   try {
     const rows = db
-      .query(
+      .prepare(
         `SELECT id, title, directory, time_updated
          FROM session
          ORDER BY time_updated DESC
@@ -36,20 +36,20 @@ export function listSessions(options: SourceOptions): SessionRow[] {
   }
 }
 
-export function findSessionById(
+export async function findSessionById(
   idOrSuffix: string,
   options: SourceOptions,
-): SessionRow {
+): Promise<SessionRow> {
   const dbPath = getDatabasePath(options);
 
   if (!fs.existsSync(dbPath)) {
     throw new Error(`Opencode database not found: ${dbPath}`);
   }
 
-  const db = new Database(dbPath, { readonly: true, create: false });
+  const db = await openDatabase(dbPath);
   try {
     const exact = db
-      .query(
+      .prepare(
         `SELECT id, title, directory, time_updated
          FROM session
          WHERE id = $id`,
@@ -58,7 +58,7 @@ export function findSessionById(
     if (exact) return exact;
 
     const matches = db
-      .query(
+      .prepare(
         `SELECT id, title, directory, time_updated
          FROM session
          WHERE substr(id, -8) = $suffix`,
@@ -88,16 +88,7 @@ export async function exportSessionToFile(
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  const proc = Bun.spawn({
-    cmd: ["opencode", "export", id],
-    stdout: Bun.file(outputPath),
-    stderr: "pipe",
-  });
-  const stderr = await new Response(proc.stderr).text();
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`opencode export failed (exit ${exitCode}):\n${stderr}`);
-  }
+  await spawnToFile(["opencode", "export", id], outputPath);
   return outputPath;
 }
 

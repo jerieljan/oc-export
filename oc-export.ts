@@ -1,8 +1,9 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import path from "node:path";
-import { loadConfig, DEFAULT_CONFIG_PATH, type ResolvedConfig } from "./src/config.ts";
-import { renderFile, renderFiles } from "./src/render.ts";
-import { pickInteractive, pickSessionById } from "./src/pick.ts";
+import { which } from "./src/util.js";
+import { loadConfig, DEFAULT_CONFIG_PATH, type ResolvedConfig } from "./src/config.js";
+import { renderFile, renderFiles } from "./src/render.js";
+import { pickInteractive, pickSessionById } from "./src/pick.js";
 
 function showHelp(): void {
   console.log(`Usage: oc-export [options] [file.json ...]
@@ -135,7 +136,7 @@ async function main(): Promise<void> {
       console.error("Error: Summarization requires summarize.model in config");
       process.exit(1);
     }
-    if (!Bun.which("llm")) {
+    if (!which("llm")) {
       console.error(
         "Error: Summarization requires the `llm` CLI to be installed and on PATH. " +
           "Install it (https://llm.datasette.io/) or omit --summarize.",
