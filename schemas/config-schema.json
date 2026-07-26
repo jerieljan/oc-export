@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/jerieljan/oc-export/master/schemas/config-schema.json",
+  "title": "oc-export configuration",
+  "description": "Configuration schema for the oc-export CLI. The file is JSONC, so comments are allowed. Missing values fall back to the defaults shown below.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri-reference",
+      "description": "URI of the JSON Schema that describes this file."
+    },
+    "raw": {
+      "type": "boolean",
+      "default": false,
+      "description": "Skip sanitization by default. When true, oc-export behaves as if --raw was passed unless --no-raw is used on the CLI."
+    },
+    "extractor": {
+      "type": "string",
+      "enum": ["opencode", "claude"],
+      "default": "opencode",
+      "description": "Default session source. Valid values are 'opencode' and 'claude'."
+    },
+    "username": {
+      "type": "string",
+      "description": "Display name used on the user-turn badge in exported HTML, rendered in uppercase via CSS."
+    },
+    "picker": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Options for the interactive session picker and --session lookups.",
+      "properties": {
+        "databasePath": {
+          "type": "string",
+          "default": "~/.local/share/opencode/opencode.db",
+          "description": "Path to the local OpenCode SQLite database. The ~ prefix is expanded to the home directory."
+        },
+        "limit": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 20,
+          "description": "Number of recent sessions shown in the interactive picker."
+        }
+      }
+    },
+    "claude": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Options for the Claude Code source.",
+      "properties": {
+        "projectsPath": {
+          "type": "string",
+          "default": "~/.claude/projects",
+          "description": "Path to the Claude Code projects directory. The ~ prefix is expanded to the home directory."
+        },
+        "limit": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 50,
+          "description": "Number of recent Claude sessions shown in the interactive picker."
+        }
+      }
+    },
+    "summarize": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Options for replacing thinking and tool-call blocks with summaries via the llm CLI.",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Master switch for the summarize feature. When false, --summarize is rejected and always is ignored."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model ID passed to llm -m. Required when summarization is active."
+        },
+        "always": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, summarization runs by default without passing --summarize."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Custom system prompt used as a fallback for both thinking and tool-call summaries."
+        },
+        "thinkingPrompt": {
+          "type": "string",
+          "description": "Custom system prompt for thinking summaries. Takes precedence over prompt."
+        },
+        "toolsPrompt": {
+          "type": "string",
+          "description": "Custom system prompt for tool-call summaries. Takes precedence over prompt."
+        },
+        "sessionSummary": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Optional session-wide summary added at the top of the HTML.",
+          "required": ["enabled"],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Generate a top-level 'Session summary' panel at the start of the HTML after per-turn summaries are complete."
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Custom system prompt for the session summary."
+            }
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": { "const": true }
+        },
+        "required": ["enabled"]
+      },
+      "then": {
+        "properties": {
+          "model": { "type": "string" }
+        },
+        "required": ["model"]
+      }
+    },
+    "navigation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Bottom turn navigation bar shown in exported HTML.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the bottom turn navigation bar."
+        },
+        "minTurns": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Only show the bar when the session has at least this many turns. A value of 0 means the bar is always shown."
+        },
+        "progressBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a thin progress line at the top of the bar."
+        },
+        "roleColor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Color pills by role: darker for user turns, lighter for assistant turns."
+        }
+      }
+    }
+  }
+}

@@ -7,6 +7,8 @@
 // fatal errors with a clear message.
 
 {
+  "$schema": "./schemas/config-schema.json",
+
   // Skip sanitization by default. When true, oc-export behaves as if --raw
   // was passed unless you explicitly use --no-raw on the command line.
   "raw": false,

@@ -183,6 +183,8 @@ bun run dev --session abc123
 
 The file is JSONC, so comments are allowed. Missing files are ignored. Malformed files are fatal errors with a clear message.
 
+A JSON Schema for the config file is available at `schemas/config-schema.json`. You can add `"$schema": "./schemas/config-schema.json"` to your config for editor autocomplete and validation.
+
 CLI flags always override config values. Config values override built-in defaults.
 
 A starter template is included in this repo as `config-example.jsonc`. Copy it to `~/.config/oc-export/config.jsonc` and edit from there:
