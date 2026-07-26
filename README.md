@@ -1,7 +1,17 @@
 # oc-export
 
 oc-export allows you to export and render chat sessions to standalone HTML files.
-This project was built primarily with OpenCode in mind, but also planning to support other formats.
+This project was built primarily with *OpenCode* in mind, but also planning to support other formats.
+
+---
+
+[![npm](https://img.shields.io/npm/v/oc-export.svg)](https://www.npmjs.com/package/oc-export)
+
+---
+
+## Example
+
+You can see an example of how the generated HTML looks like here, with summarization enabled: https://oc-export-demo.jerieljan.dev
 
 ## Why?
 
