@@ -148,8 +148,8 @@
         },
         "roleColor": {
           "type": "boolean",
-          "default": true,
-          "description": "Color pills by role: darker for user turns, lighter for assistant turns."
+          "default": false,
+          "description": "Opt in to color pills by role: darker for user turns, lighter for assistant turns."
         }
       }
     }

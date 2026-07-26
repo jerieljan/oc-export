@@ -243,7 +243,7 @@ oc-export --config ~/.oc-export.jsonc session.json
 | `navigation.enabled` | boolean | `true` | Show the bottom turn navigation bar |
 | `navigation.minTurns` | number | `0` | Only show the bar when the session has at least this many turns |
 | `navigation.progressBar` | boolean | `true` | Show a thin progress line at the top of the bar |
-| `navigation.roleColor` | boolean | `true` | Color pills by role: darker for user turns, lighter for assistant turns |
+| `navigation.roleColor` | boolean | `false` | Opt in to color pills by role: darker for user turns, lighter for assistant turns |
 
 ## Summarization
 

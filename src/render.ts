@@ -195,7 +195,7 @@ function renderTurnScrubber(
     enabled: navigation?.enabled ?? true,
     minTurns: navigation?.minTurns ?? 0,
     progressBar: navigation?.progressBar ?? true,
-    roleColor: navigation?.roleColor ?? true,
+    roleColor: navigation?.roleColor ?? false,
   };
 
   if (!nav.enabled || turns.length < nav.minTurns) {
@@ -260,7 +260,7 @@ function buildPage(
     enabled: navigation?.enabled ?? true,
     minTurns: navigation?.minTurns ?? 0,
     progressBar: navigation?.progressBar ?? true,
-    roleColor: navigation?.roleColor ?? true,
+    roleColor: navigation?.roleColor ?? false,
   };
   const navHtml = renderTurnScrubber(turns, navConfig);
   const activeNav = navHtml !== "" ? navConfig : undefined;
@@ -1148,7 +1148,7 @@ ${navigation ? scrubberStyles(navigation) : ''}
 
 function scrubberStyles(navigation: NavigationConfig): string {
   const progressBar = navigation.progressBar ?? true;
-  const roleColor = navigation.roleColor ?? true;
+  const roleColor = navigation.roleColor ?? false;
   const progressStyles = progressBar
     ? `
 .turn-scrubber-progress {

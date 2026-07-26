@@ -86,7 +86,7 @@
     // Show a thin progress line at the top of the bar.
     "progressBar": true,
 
-    // Color pills by role: darker for user turns, lighter for assistant turns.
-    "roleColor": true
+    // Opt in to color pills by role: darker for user turns, lighter for assistant turns.
+    "roleColor": false
   }
 }
