@@ -72,6 +72,11 @@ function serializeThinking(thinking: string[]): string {
 function serializeTools(tools: ToolCall[]): string {
   return tools
     .map((tool, index) => {
+      if (tool.subagent) {
+        const title = tool.subagent.title || tool.subagent.sessionId.slice(-8);
+        const state = tool.subagent.state ? ` (${tool.subagent.state})` : "";
+        return `${index + 1}. Subagent: ${title}${state}`;
+      }
       const parts = [`${index + 1}. ${tool.name}`];
       if (tool.input.trim()) {
         parts.push(`Input:\n${tool.input}`);

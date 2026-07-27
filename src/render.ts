@@ -12,7 +12,7 @@ import {
   formatTimestampIsoWithTimezone,
   formatTokens,
 } from "./format.js";
-import type { Reference, SessionMeta, SessionStats, Turn } from "./types.js";
+import type { Reference, SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "./types.js";
 
 const md = new MarkdownIt({
   html: false,
@@ -27,16 +27,32 @@ export interface RenderOptions {
   summarize?: SummarizeOptions;
   username?: string;
   navigation?: NavigationConfig;
+  parentOutputPath?: string;
+  parentTitle?: string;
+  totalCost?: number;
 }
 
 function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
   meta.title = sanitizeText(meta.title);
   meta.sessionId = meta.sessionId ? sanitizeText(meta.sessionId) : undefined;
+  meta.parentSessionId = meta.parentSessionId
+    ? sanitizeText(meta.parentSessionId)
+    : undefined;
   meta.created = meta.created ? sanitizeText(meta.created) : undefined;
   meta.updated = meta.updated ? sanitizeText(meta.updated) : undefined;
   meta.sessionSummary = meta.sessionSummary
     ? sanitizeText(meta.sessionSummary)
     : undefined;
+
+  if (meta.subagents) {
+    for (const sub of meta.subagents) {
+      sub.sessionId = sanitizeText(sub.sessionId);
+      sub.title = sub.title ? sanitizeText(sub.title) : undefined;
+      sub.description = sub.description
+        ? sanitizeText(sub.description)
+        : undefined;
+    }
+  }
 
   for (const turn of turns) {
     turn.content = sanitizeText(turn.content);
@@ -54,6 +70,18 @@ function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
       tool.name = sanitizeText(tool.name);
       tool.input = sanitizeText(tool.input);
       tool.output = sanitizeText(tool.output);
+      if (tool.subagent) {
+        tool.subagent.sessionId = sanitizeText(tool.subagent.sessionId);
+        tool.subagent.title = tool.subagent.title
+          ? sanitizeText(tool.subagent.title)
+          : undefined;
+        tool.subagent.description = tool.subagent.description
+          ? sanitizeText(tool.subagent.description)
+          : undefined;
+        tool.subagent.state = tool.subagent.state
+          ? sanitizeText(tool.subagent.state)
+          : undefined;
+      }
     }
 
     if (turn.references) {
@@ -64,6 +92,25 @@ function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
       }
     }
   }
+}
+
+function last8(id: string): string {
+  return id.slice(-8);
+}
+
+function sessionHtmlPath(sessionId: string): string {
+  return `./session-${last8(sessionId)}.html`;
+}
+
+function formatCostWithTotal(
+  cost: number | undefined,
+  totalCost: number | undefined,
+): string | undefined {
+  const parent = formatCost(cost);
+  const total = formatCost(totalCost);
+  if (!parent) return total;
+  if (!total || total === parent) return parent;
+  return `${parent} (${total} total)`;
 }
 
 function escapeHtml(text: string): string {
@@ -187,6 +234,40 @@ function renderSessionSummary(summary: string): string {
 </section>`;
 }
 
+function renderParentLink(parentSessionId: string, parentTitle?: string, parentOutputPath?: string): string {
+  const href = escapeHtml(parentOutputPath ?? sessionHtmlPath(parentSessionId));
+  const text = parentTitle ? parentTitle : parentSessionId.slice(-8);
+  return `
+<div class="parent-link">
+  <a href="${href}">← Parent session: ${escapeHtml(text)}</a>
+</div>`;
+}
+
+function renderSubagentRelations(subagents: SubagentLink[]): string {
+  if (subagents.length === 0) return "";
+  const items = subagents
+    .map((sub) => {
+      const title = sub.title || sub.sessionId.slice(-8);
+      const description = sub.description
+        ? `<p class="subagent-relation-description">${escapeHtml(sub.description)}</p>`
+        : "";
+      return `
+      <li>
+        <a href="${escapeHtml(sessionHtmlPath(sub.sessionId))}">${escapeHtml(title)}</a>
+        ${description}
+      </li>`;
+    })
+    .join("\n");
+
+  return `
+<section class="container subagent-relations">
+  <h2 class="subagent-relations-heading">Subagent sessions</h2>
+  <ol class="subagent-relations-list">
+    ${items}
+  </ol>
+</section>`;
+}
+
 function renderTurnScrubber(
   turns: Turn[],
   navigation?: NavigationConfig,
@@ -230,6 +311,8 @@ function buildPage(
   turns: Turn[],
   username?: string,
   navigation?: NavigationConfig,
+  parentOutputPath?: string,
+  parentTitle?: string,
 ): string {
   const title = escapeHtml(meta.title);
   const created = meta.created ?? formatTimestamp(meta.stats?.createdMs);
@@ -239,7 +322,7 @@ function buildPage(
       ? `<span title="${escapeHtml(createdIso)}">${escapeHtml(created)}</span>`
       : escapeHtml(created)
     : "";
-  const subtitle = [createdHtml, formatDuration(meta.stats?.durationMs), formatCost(meta.stats?.cost)]
+  const subtitle = [createdHtml, formatDuration(meta.stats?.durationMs), formatCostWithTotal(meta.stats?.cost, meta.stats?.totalCost)]
     .filter(Boolean)
     .join(" - ");
 
@@ -255,6 +338,12 @@ function buildPage(
   const statsHtml = renderStats(meta);
   const sessionSummaryHtml = meta.sessionSummary
     ? renderSessionSummary(meta.sessionSummary)
+    : "";
+  const parentLinkHtml = meta.parentSessionId
+    ? renderParentLink(meta.parentSessionId, parentTitle, parentOutputPath)
+    : "";
+  const subagentRelationsHtml = meta.subagents && meta.subagents.length > 0
+    ? renderSubagentRelations(meta.subagents)
     : "";
   const navConfig = {
     enabled: navigation?.enabled ?? true,
@@ -284,6 +373,7 @@ ${styles(activeNav)}
   <div class="container">
     <div class="header-content">
       <div>
+        ${parentLinkHtml}
         <h1 class="session-title">${title}</h1>
         <p class="session-meta">${subtitle}</p>
       </div>
@@ -304,6 +394,7 @@ ${styles(activeNav)}
   </div>
 </header>
 ${sessionSummaryHtml}
+${subagentRelationsHtml}
 <main class="container chat">
 ${turnHtml}
 </main>
@@ -412,6 +503,29 @@ function renderTurnReferences(refs: Reference[], turnIndex: number): string {
 </details>`;
 }
 
+function renderSubagentTool(tool: ToolCall): string {
+  const sub = tool.subagent!;
+  const title = sub.title || sub.sessionId.slice(-8);
+  const state = sub.state ? `<span class="subagent-state">${escapeHtml(sub.state)}</span>` : "";
+  const description = sub.description
+    ? `<p class="subagent-description">${escapeHtml(sub.description)}</p>`
+    : "";
+  const href = escapeHtml(sessionHtmlPath(sub.sessionId));
+
+  return `
+<div class="subagent-card">
+  <div class="subagent-header">
+    <span class="subagent-badge">Subagent</span>
+    <span class="subagent-title">${escapeHtml(title)}</span>
+    ${state}
+  </div>
+  <div class="subagent-body">
+    ${description}
+    <a class="subagent-link" href="${href}">Open subagent session</a>
+  </div>
+</div>`;
+}
+
 function renderAssistantTurn(turn: Turn, index: number): string {
   const parts: string[] = [];
 
@@ -429,11 +543,19 @@ function renderAssistantTurn(turn: Turn, index: number): string {
   }
 
   if (turn.tools.length > 0) {
-    const toolsBody = turn.toolsSummary
-      ? `<div class="thinking-block">${md.render(turn.toolsSummary)}</div>`
-      : turn.tools
-          .map((tool) => {
-            return `
+    const subagentTools = turn.tools.filter((tool) => tool.subagent);
+    const regularTools = turn.tools.filter((tool) => !tool.subagent);
+
+    if (subagentTools.length > 0) {
+      parts.push(subagentTools.map((tool) => renderSubagentTool(tool)).join("\n"));
+    }
+
+    if (regularTools.length > 0) {
+      const toolsBody = turn.toolsSummary
+        ? `<div class="thinking-block">${md.render(turn.toolsSummary)}</div>`
+        : regularTools
+            .map((tool) => {
+              return `
 <details class="collapsible tool">
   <summary><span class="tool-name">${escapeHtml(tool.name)}</span></summary>
   <div class="tool-section">
@@ -445,13 +567,14 @@ function renderAssistantTurn(turn: Turn, index: number): string {
     <div class="tool-output">${md.render(tool.output)}</div>
   </div>
 </details>`;
-          })
-          .join("\n");
-    parts.push(`
+            })
+            .join("\n");
+      parts.push(`
 <details class="collapsible tools">
-  <summary>Tool calls (${turn.tools.length})</summary>
+  <summary>Tool calls (${regularTools.length})</summary>
   ${toolsBody}
 </details>`);
+    }
   }
 
   const hasReferences = turn.references && turn.references.length > 0;
@@ -926,6 +1049,137 @@ html.dark .theme-icon-light {
 
 .synthetic-code:last-child {
   margin-bottom: 0;
+}
+
+.parent-link {
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+.parent-link a {
+  color: var(--accent-dark);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.parent-link a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+
+.subagent-relations {
+  background: var(--bg);
+  border: 1px dashed var(--border-strong);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-top: 2rem;
+  margin-bottom: 0;
+}
+
+.subagent-relations-heading {
+  margin: 0 0 1rem;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.subagent-relations-list {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+  font-size: 0.95rem;
+}
+
+.subagent-relations-list li {
+  margin: 0.5rem 0;
+  color: var(--text);
+}
+
+.subagent-relations-list a {
+  color: var(--accent-dark);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.subagent-relations-list a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+
+.subagent-relation-description {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.subagent-card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent-dark);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  box-shadow: var(--shadow);
+}
+
+.subagent-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.subagent-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.4rem;
+  line-height: 1.4;
+  color: var(--badge-assistant-text);
+  background: var(--accent-dark);
+}
+
+.subagent-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.subagent-state {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.subagent-body {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.subagent-description {
+  margin: 0 0 0.5rem;
+  line-height: 1.5;
+}
+
+.subagent-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--accent-dark);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.subagent-link:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
 }
 
 .tool-name {
@@ -1480,7 +1734,18 @@ export async function renderFile(
     }
   }
 
-  const html = buildPage(meta, turns, username, options.navigation);
+  if (options.totalCost !== undefined && meta.stats) {
+    meta.stats.totalCost = options.totalCost;
+  }
+
+  const html = buildPage(
+    meta,
+    turns,
+    username,
+    options.navigation,
+    options.parentOutputPath,
+    options.parentTitle,
+  );
   const outputPath = options.outputPath
     ? path.resolve(options.outputPath)
     : resolveOutputPath(resolved);

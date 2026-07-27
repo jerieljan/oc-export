@@ -5,6 +5,7 @@ import { DEFAULT_CONFIG, type ResolvedConfig } from "./config.js";
 import { sanitizePathForDisplay } from "./sanitize.js";
 import { renderFile } from "./render.js";
 import { getSource, type Source } from "./sources/index.js";
+import type { SessionRow } from "./sources/types.js";
 import type { SummarizeOptions } from "./summarize.js";
 
 export interface PickOptions {
@@ -51,19 +52,31 @@ function resolveSessionOutputPaths(
   };
 }
 
-export async function exportAndRenderSession(
+interface ExportContext {
+  parentHtmlPath?: string;
+  parentTitle?: string;
+}
+
+async function exportAndRenderSingleSession(
   id: string,
-  options: PickOptions = {},
-): Promise<void> {
+  options: PickOptions,
+  source: Source,
+  jsonPath: string,
+  htmlPath: string,
+  parentContext: ExportContext = {},
+  totalCost?: number,
+): Promise<string> {
   const { sanitize = true, config = DEFAULT_CONFIG, summarize } = options;
-  const source = getSourceFromConfig(config);
-  const { jsonPath, htmlPath } = resolveSessionOutputPaths(id, options.outputBase);
 
   const displayJson = sanitize ? sanitizePathForDisplay(jsonPath) : path.basename(jsonPath);
   const displayHtml = sanitize ? sanitizePathForDisplay(htmlPath) : path.basename(htmlPath);
 
   console.log(`Exporting session ${id} via ${source.label} → ${displayJson}`);
   await source.exportSessionToFile(id, jsonPath, { config });
+
+  const parentOutputPath = parentContext.parentHtmlPath
+    ? `./${path.basename(parentContext.parentHtmlPath)}`
+    : undefined;
 
   console.log(`Rendering → ${displayHtml}`);
   await renderFile(jsonPath, {
@@ -72,9 +85,69 @@ export async function exportAndRenderSession(
     summarize,
     username: config.username,
     navigation: config.navigation,
+    parentOutputPath,
+    parentTitle: parentContext.parentTitle,
+    totalCost,
   });
 
   console.log(`Done: ${displayJson} → ${displayHtml}`);
+  return htmlPath;
+}
+
+export async function exportAndRenderSession(
+  id: string,
+  options: PickOptions = {},
+): Promise<void> {
+  const { config = DEFAULT_CONFIG } = options;
+  const source = getSourceFromConfig(config);
+  const { jsonPath, htmlPath } = resolveSessionOutputPaths(id, options.outputBase);
+
+  const parentRow = await source.findSessionById(id, { config });
+  const parentCost = parentRow.cost ?? 0;
+
+  let totalCost = parentCost;
+  let children: SessionRow[] = [];
+  if (source.findChildSessions) {
+    children = await source.findChildSessions(id, { config });
+    for (const child of children) {
+      totalCost += child.cost ?? 0;
+    }
+  }
+
+  const parentTotalCost = totalCost > parentCost ? totalCost : undefined;
+  const parentHtmlPath = await exportAndRenderSingleSession(
+    id,
+    options,
+    source,
+    jsonPath,
+    htmlPath,
+    {},
+    parentTotalCost,
+  );
+
+  if (children.length === 0) {
+    return;
+  }
+
+  const parentDir = path.dirname(htmlPath);
+
+  console.log(`Exporting ${children.length} subagent session(s)...`);
+  for (const child of children) {
+    const suffix = last8(child.id);
+    const childJsonPath = path.join(parentDir, `session-${suffix}.jsonl`);
+    const childHtmlPath = path.join(parentDir, `session-${suffix}.html`);
+    await exportAndRenderSingleSession(
+      child.id,
+      options,
+      source,
+      childJsonPath,
+      childHtmlPath,
+      {
+        parentHtmlPath,
+        parentTitle: parentRow.title,
+      },
+    );
+  }
 }
 
 export async function pickInteractive(options: PickOptions = {}): Promise<void> {

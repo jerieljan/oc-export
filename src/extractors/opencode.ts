@@ -1,5 +1,5 @@
 import type { Extractor } from "./types.js";
-import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
+import type { SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "../types.js";
 import { formatTimestamp } from "../format.js";
 
 // JSON export format produced by Opencode.
@@ -11,6 +11,7 @@ interface JsonSession {
 interface JsonSessionInfo {
   id: string;
   title: string;
+  parentID?: string;
   agent?: string;
   model?: { id?: string; providerID?: string };
   version?: string;
@@ -62,7 +63,12 @@ interface JsonToolState {
   status?: string;
   input?: Record<string, unknown>;
   output?: string;
-  metadata?: { truncated?: boolean; outputPath?: string };
+  metadata?: {
+    truncated?: boolean;
+    outputPath?: string;
+    parentSessionId?: string;
+    sessionId?: string;
+  };
   title?: string;
   time?: { start?: number; end?: number };
 }
@@ -168,6 +174,7 @@ function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Tur
   const meta: SessionMeta = {
     title: info.title || "Chat Session",
     sessionId: info.id,
+    parentSessionId: info.parentID,
     created: formatTimestamp(info.time?.created),
     updated: formatTimestamp(info.time?.updated),
     stats: computeStats(session),
@@ -175,6 +182,7 @@ function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Tur
 
   const turns: Turn[] = [];
   const assistantBuckets = new Map<string, Turn>();
+  const subagentsById = new Map<string, SubagentLink>();
 
   for (const message of session.messages) {
     const role = message.info.role;
@@ -221,7 +229,17 @@ function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Tur
           break;
         case "tool":
           if (part.tool && part.state) {
-            turn.tools.push(parseJsonTool(part.tool, part.state));
+            const tool = parseJsonTool(part.tool, part.state);
+            turn.tools.push(tool);
+            if (tool.subagent) {
+              if (!subagentsById.has(tool.subagent.sessionId)) {
+                subagentsById.set(tool.subagent.sessionId, {
+                  sessionId: tool.subagent.sessionId,
+                  title: tool.subagent.title,
+                  description: tool.subagent.description,
+                });
+              }
+            }
           }
           break;
         case "step-start":
@@ -233,6 +251,10 @@ function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Tur
           break;
       }
     }
+  }
+
+  if (subagentsById.size > 0) {
+    meta.subagents = [...subagentsById.values()];
   }
 
   return { meta, turns };
@@ -277,6 +299,13 @@ function buildAssistantHeader(info: JsonMessageInfo): string | undefined {
   return bits.length > 0 ? bits.join(" · ") : undefined;
 }
 
+function parseTaskState(state: JsonToolState): { stateValue?: string; sessionId?: string } {
+  if (!state.output) return {};
+  const match = state.output.match(/<task\s+id="([^"]+)"\s+state="([^"]+)"/);
+  if (!match) return {};
+  return { sessionId: match[1], stateValue: match[2] };
+}
+
 function parseJsonTool(toolName: string, state: JsonToolState): ToolCall {
   const input = state.input
     ? JSON.stringify(state.input, null, 2)
@@ -285,7 +314,31 @@ function parseJsonTool(toolName: string, state: JsonToolState): ToolCall {
   if (state.metadata?.truncated) {
     output = output.trimEnd();
   }
-  return { name: toolName, input, output };
+
+  const tool: ToolCall = { name: toolName, input, output };
+
+  if (toolName === "task" && state.metadata?.sessionId) {
+    const task = parseTaskState(state);
+    let title: string | undefined = state.title;
+    let description: string | undefined;
+    if (typeof state.input === "object" && state.input !== null) {
+      description = (state.input as { description?: string }).description;
+    }
+    if (!title && description) {
+      title = description;
+    }
+    if (description === title) {
+      description = undefined;
+    }
+    tool.subagent = {
+      sessionId: state.metadata.sessionId,
+      title,
+      description,
+      state: task.stateValue || state.status,
+    };
+  }
+
+  return tool;
 }
 
 export const opencodeExtractor: Extractor = {

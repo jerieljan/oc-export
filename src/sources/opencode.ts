@@ -24,12 +24,38 @@ export async function listSessions(options: SourceOptions): Promise<SessionRow[]
   try {
     const rows = db
       .prepare(
-        `SELECT id, title, directory, time_updated
+        `SELECT id, title, directory, time_updated, cost
          FROM session
          ORDER BY time_updated DESC
          LIMIT $limit`,
       )
       .all({ $limit: limit }) as SessionRow[];
+    return rows;
+  } finally {
+    db.close();
+  }
+}
+
+export async function findChildSessions(
+  parentId: string,
+  options: SourceOptions,
+): Promise<SessionRow[]> {
+  const dbPath = getDatabasePath(options);
+
+  if (!fs.existsSync(dbPath)) {
+    throw new Error(`Opencode database not found: ${dbPath}`);
+  }
+
+  const db = await openDatabase(dbPath);
+  try {
+    const rows = db
+      .prepare(
+        `SELECT id, title, directory, time_updated, cost
+         FROM session
+         WHERE parent_id = $parentId
+         ORDER BY time_created ASC`,
+      )
+      .all({ $parentId: parentId }) as SessionRow[];
     return rows;
   } finally {
     db.close();
@@ -50,7 +76,7 @@ export async function findSessionById(
   try {
     const exact = db
       .prepare(
-        `SELECT id, title, directory, time_updated
+        `SELECT id, title, directory, time_updated, cost
          FROM session
          WHERE id = $id`,
       )
@@ -59,7 +85,7 @@ export async function findSessionById(
 
     const matches = db
       .prepare(
-        `SELECT id, title, directory, time_updated
+        `SELECT id, title, directory, time_updated, cost
          FROM session
          WHERE substr(id, -8) = $suffix`,
       )
@@ -97,5 +123,6 @@ export const opencodeSource: Source = {
   label: "Opencode",
   listSessions,
   findSessionById,
+  findChildSessions,
   exportSessionToFile: (id, outputPath) => exportSessionToFile(id, outputPath),
 };

@@ -95,6 +95,8 @@ Open WebUI exports may contain multiple conversation branches; only the currentl
 
 Claude Code sessions are read directly from `~/.claude/projects`. Subagent conversations are inlined into the parent session as tool-call blocks.
 
+OpenCode sessions that spawn subagents are exported as a family: the parent HTML links to each subagent session and the subagent HTML links back to the parent. Choosing a parent session in the picker or via `--session` exports the parent and all of its subagents.
+
 Additional formats can be added by implementing an extractor in `src/extractors/` and registering it in `src/extractors/index.ts`.
 
 ## AI-generated Disclosure

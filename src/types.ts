@@ -1,12 +1,20 @@
 // Canonical session model shared by all extractors and the renderer.
 
+export interface SubagentLink {
+  sessionId: string;
+  title?: string;
+  description?: string;
+}
+
 export interface SessionMeta {
   title: string;
   sessionId?: string;
+  parentSessionId?: string;
   created?: string;
   updated?: string;
   stats?: SessionStats;
   sessionSummary?: string;
+  subagents?: SubagentLink[];
 }
 
 export interface SessionStats {
@@ -14,6 +22,7 @@ export interface SessionStats {
   updatedMs?: number;
   durationMs?: number;
   cost?: number;
+  totalCost?: number;
   tokensInput?: number;
   tokensOutput?: number;
   tokensReasoning?: number;
@@ -25,10 +34,18 @@ export interface SessionStats {
   toolParts?: number;
 }
 
+export interface SubagentRef {
+  sessionId: string;
+  title?: string;
+  description?: string;
+  state?: string;
+}
+
 export interface ToolCall {
   name: string;
   input: string;
   output: string;
+  subagent?: SubagentRef;
 }
 
 export interface Reference {

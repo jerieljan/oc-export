@@ -7,6 +7,7 @@ export interface SessionRow {
   title: string;
   directory: string;
   time_updated: number;
+  cost?: number;
 }
 
 // Options passed to source methods.
@@ -29,6 +30,13 @@ export interface Source {
     idOrSuffix: string,
     options: SourceOptions,
   ): Promise<SessionRow> | SessionRow;
+
+  // Find sessions that were spawned as subagents of a parent session.
+  // Optional; sources that do not store parent/child relationships may omit it.
+  findChildSessions?(
+    parentId: string,
+    options: SourceOptions,
+  ): Promise<SessionRow[]> | SessionRow[];
 
   // Export a session to a file on disk and return the written path.
   // The caller is responsible for rendering the exported file.
