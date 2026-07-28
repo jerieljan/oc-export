@@ -11,7 +11,7 @@ function showHelp(): void {
 Render chat sessions to standalone HTML files.
 
 Options:
-  --extractor <name>  Session source: opencode (default) or claude
+  --extractor <name>  Session source: opencode (default), claude, or pi
   --session <id>      Export a session by full ID or last 8 characters and render it
   --output <name>     Rename both output files to <name>.jsonl and <name>.html
   --raw               Skip sanitization
@@ -27,7 +27,9 @@ Config file:
 Examples:
   oc-export                               # interactive picker (default: opencode)
   oc-export --extractor claude            # interactive picker for Claude Code
+  oc-export --extractor pi                # interactive picker for Pi
   oc-export --extractor claude --session abc123
+  oc-export --extractor pi --session abc123
   oc-export --output report               # picker with custom output names
   oc-export session.jsonl                 # render a JSONL file
   oc-export session.json                # render a JSON file

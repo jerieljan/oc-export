@@ -18,9 +18,9 @@
     },
     "extractor": {
       "type": "string",
-      "enum": ["opencode", "claude"],
+      "enum": ["opencode", "claude", "pi"],
       "default": "opencode",
-      "description": "Default session source. Valid values are 'opencode' and 'claude'."
+      "description": "Default session source. Valid values are 'opencode', 'claude', and 'pi'."
     },
     "username": {
       "type": "string",
@@ -57,8 +57,24 @@
         "limit": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "default": 50,
-          "description": "Number of recent Claude sessions shown in the interactive picker."
+          "description": "Number of recent Claude sessions shown in the interactive picker. Defaults to picker.limit."
+        }
+      }
+    },
+    "pi": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Options for the Pi session source.",
+      "properties": {
+        "sessionsPath": {
+          "type": "string",
+          "default": "~/.pi/agent/sessions",
+          "description": "Path to the Pi sessions directory. The ~ prefix is expanded to the home directory."
+        },
+        "limit": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Number of recent Pi sessions shown in the interactive picker. Defaults to picker.limit."
         }
       }
     },

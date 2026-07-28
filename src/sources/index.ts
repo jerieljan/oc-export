@@ -1,8 +1,9 @@
 import type { Source } from "./types.js";
 import { claudeSource } from "./claude.js";
 import { opencodeSource } from "./opencode.js";
+import { piSource } from "./pi.js";
 
-const sources: Source[] = [opencodeSource, claudeSource];
+const sources: Source[] = [opencodeSource, claudeSource, piSource];
 
 export function registerSource(source: Source): void {
   sources.unshift(source);

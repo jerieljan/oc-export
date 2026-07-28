@@ -4,10 +4,12 @@ import { kagiExtractor } from "./kagi.js";
 import { claudeExtractor } from "./claude.js";
 import { opencodeExtractor } from "./opencode.js";
 import { openWebUIExtractor } from "./openwebui.js";
+import { piExtractor } from "./pi.js";
 
 const extractors: Extractor[] = [
   openWebUIExtractor,
   kagiExtractor,
+  piExtractor,
   claudeExtractor,
   opencodeExtractor,
 ];

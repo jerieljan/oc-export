@@ -18,6 +18,11 @@ export interface ClaudeConfig {
   limit: number;
 }
 
+export interface PiConfig {
+  sessionsPath: string;
+  limit: number;
+}
+
 export interface SessionSummaryConfig {
   enabled?: boolean;
   prompt?: string;
@@ -46,6 +51,7 @@ export interface UserConfig {
   username?: string;
   picker?: Partial<PickerConfig>;
   claude?: Partial<ClaudeConfig>;
+  pi?: Partial<PiConfig>;
   summarize?: SummarizeConfig;
   navigation?: NavigationConfig;
 }
@@ -56,6 +62,7 @@ export interface ResolvedConfig {
   username?: string;
   picker: PickerConfig;
   claude: ClaudeConfig;
+  pi: PiConfig;
   summarize?: SummarizeConfig;
   navigation?: NavigationConfig;
 }
@@ -70,7 +77,12 @@ export const DEFAULT_PICKER_CONFIG: PickerConfig = {
 
 export const DEFAULT_CLAUDE_CONFIG: ClaudeConfig = {
   projectsPath: path.join(os.homedir(), ".claude/projects"),
-  limit: 50,
+  limit: DEFAULT_PICKER_CONFIG.limit,
+};
+
+export const DEFAULT_PI_CONFIG: PiConfig = {
+  sessionsPath: path.join(os.homedir(), ".pi/agent/sessions"),
+  limit: DEFAULT_PICKER_CONFIG.limit,
 };
 
 export const DEFAULT_CONFIG: ResolvedConfig = {
@@ -78,6 +90,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   extractor: "opencode",
   picker: DEFAULT_PICKER_CONFIG,
   claude: DEFAULT_CLAUDE_CONFIG,
+  pi: DEFAULT_PI_CONFIG,
 };
 
 function expandHomeDir(inputPath: string): string {
@@ -145,6 +158,13 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
   validateString(config.claude?.projectsPath, "claude.projectsPath");
   validatePositiveNumber(config.claude?.limit, "claude.limit");
 
+  if (config.pi !== undefined && typeof config.pi !== "object") {
+    throw new Error('Config error: "pi" must be an object');
+  }
+
+  validateString(config.pi?.sessionsPath, "pi.sessionsPath");
+  validatePositiveNumber(config.pi?.limit, "pi.limit");
+
   if (config.summarize !== undefined && typeof config.summarize !== "object") {
     throw new Error('Config error: "summarize" must be an object');
   }
@@ -178,6 +198,8 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
     validateBoolean(config.navigation.roleColor, "navigation.roleColor");
   }
 
+  const pickerLimit = config.picker?.limit ?? DEFAULT_PICKER_CONFIG.limit;
+
   return {
     raw: config.raw ?? DEFAULT_CONFIG.raw,
     extractor: config.extractor ?? DEFAULT_CONFIG.extractor,
@@ -186,13 +208,19 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
       databasePath: config.picker?.databasePath
         ? expandHomeDir(config.picker.databasePath)
         : DEFAULT_PICKER_CONFIG.databasePath,
-      limit: config.picker?.limit ?? DEFAULT_PICKER_CONFIG.limit,
+      limit: pickerLimit,
     },
     claude: {
       projectsPath: config.claude?.projectsPath
         ? expandHomeDir(config.claude.projectsPath)
         : DEFAULT_CLAUDE_CONFIG.projectsPath,
-      limit: config.claude?.limit ?? DEFAULT_CLAUDE_CONFIG.limit,
+      limit: config.claude?.limit ?? pickerLimit,
+    },
+    pi: {
+      sessionsPath: config.pi?.sessionsPath
+        ? expandHomeDir(config.pi.sessionsPath)
+        : DEFAULT_PI_CONFIG.sessionsPath,
+      limit: config.pi?.limit ?? pickerLimit,
     },
     summarize: config.summarize,
     navigation: config.navigation,

@@ -87,7 +87,7 @@ function getProjectsPath(options: SourceOptions): string {
 }
 
 function getLimit(options: SourceOptions): number {
-  return options.config.claude?.limit ?? 50;
+  return options.config.claude?.limit ?? options.config.picker.limit;
 }
 
 function findSessionIndices(projectsPath: string): string[] {

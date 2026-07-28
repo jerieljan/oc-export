@@ -88,6 +88,7 @@ These are the supported formats. This is a work in progress.
 
 - **OpenCode JSON exports** (primary format)
 - **Claude Code JSONL exports** (experimental)
+- **Pi JSONL exports** (experimental)
 - **Kagi Assistant JSON exports**
 - **Open WebUI JSON exports**
 
@@ -233,7 +234,9 @@ oc-export --config ~/.oc-export.jsonc session.json
 | `picker.databasePath` | string | `~/.local/share/opencode/opencode.db` | Path to the OpenCode SQLite database |
 | `picker.limit` | number | `20` | Number of recent sessions shown in the interactive picker |
 | `claude.projectsPath` | string | `~/.claude/projects` | Path to the Claude Code projects directory |
-| `claude.limit` | number | `50` | Number of recent Claude sessions shown in the interactive picker |
+| `claude.limit` | number | `picker.limit` | Number of recent Claude sessions shown in the interactive picker |
+| `pi.sessionsPath` | string | `~/.pi/agent/sessions` | Path to the Pi sessions directory |
+| `pi.limit` | number | `picker.limit` | Number of recent Pi sessions shown in the interactive picker |
 | `summarize.enabled` | boolean | `false` | Master switch for the summarize feature |
 | `summarize.model` | string | — | Model ID passed to `llm -m`; required when summarizing |
 | `summarize.always` | boolean | `false` | Run summarization by default without `--summarize` |

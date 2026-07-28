@@ -12,7 +12,7 @@ import {
   formatTimestampIsoWithTimezone,
   formatTokens,
 } from "./format.js";
-import type { Reference, SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "./types.js";
+import type { ExtensionState, Reference, SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "./types.js";
 
 const md = new MarkdownIt({
   html: false,
@@ -59,6 +59,12 @@ function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
     turn.header = turn.header ? sanitizeText(turn.header) : undefined;
     turn.thinking = turn.thinking.map(sanitizeText);
     turn.synthetic = turn.synthetic.map(sanitizeText);
+    if (turn.extensions) {
+      for (const extension of turn.extensions) {
+        extension.customType = sanitizeText(extension.customType);
+        extension.data = sanitizeText(extension.data);
+      }
+    }
     turn.thinkingSummary = turn.thinkingSummary
       ? sanitizeText(turn.thinkingSummary)
       : undefined;
@@ -407,6 +413,19 @@ ${scripts(activeNav)}
 </html>`;
 }
 
+function renderExtensions(extensions: ExtensionState[]): string {
+  if (extensions.length === 0) return "";
+  const items = extensions
+    .map((extension) => {
+      return `<details class="collapsible extension">
+  <summary>Extension state: ${escapeHtml(extension.customType)}</summary>
+  <pre class="extension-code"><code>${escapeHtml(extension.data)}</code></pre>
+</details>`;
+    })
+    .join("\n");
+  return items;
+}
+
 function renderUserTurn(turn: Turn, index: number, username?: string): string {
   const messageBlock = turn.content.trim()
     ? `<div class="message user-message">\n    ${md.render(turn.content)}\n  </div>`
@@ -428,6 +447,9 @@ function renderUserTurn(turn: Turn, index: number, username?: string): string {
   }
 
   const badgeLabel = escapeHtml(username ?? "User");
+  const extensionsBlock = turn.extensions?.length
+    ? renderExtensions(turn.extensions)
+    : "";
 
   return `
 <article class="turn user-turn" id="turn-${index}">
@@ -436,6 +458,7 @@ function renderUserTurn(turn: Turn, index: number, username?: string): string {
   </div>
   ${messageBlock}
   ${syntheticBlock}
+  ${extensionsBlock}
 </article>`;
 }
 
@@ -591,6 +614,10 @@ function renderAssistantTurn(turn: Turn, index: number): string {
     ? renderTurnReferences(turn.references!, index)
     : "";
 
+  const extensionsBlock = turn.extensions?.length
+    ? renderExtensions(turn.extensions)
+    : "";
+
   return `
 <article class="turn assistant-turn" id="turn-${index}">
   <div class="turn-header">
@@ -598,6 +625,7 @@ function renderAssistantTurn(turn: Turn, index: number): string {
     ${turn.header ? `<div class="assistant-info">${escapeHtml(turn.header)}</div>` : ""}
   </div>
   ${parts.join("\n")}
+  ${extensionsBlock}
   ${messageBlock}
   ${referencesBlock}
 </article>`;
@@ -1049,6 +1077,28 @@ html.dark .theme-icon-light {
 
 .synthetic-code:last-child {
   margin-bottom: 0;
+}
+
+.extension {
+  border-left: 3px solid var(--accent-light);
+  margin-top: 0.75rem;
+}
+
+.extension-code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  padding: 0.75rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  max-height: 40vh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-secondary);
 }
 
 .parent-link {

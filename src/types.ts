@@ -48,6 +48,11 @@ export interface ToolCall {
   subagent?: SubagentRef;
 }
 
+export interface ExtensionState {
+  customType: string;
+  data: string;
+}
+
 export interface Reference {
   index: number;
   url: string;
@@ -66,6 +71,7 @@ export interface Turn {
   references?: Reference[];
   content: string;
   synthetic: string[];
+  extensions?: ExtensionState[];
   thinkingSummary?: string;
   toolsSummary?: string;
 }
