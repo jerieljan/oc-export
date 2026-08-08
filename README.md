@@ -45,6 +45,7 @@ These options are configured either via flags or the config.jsonc file. See the 
 
 - Node 18+ **or** a working Bun setup.
 - The `opencode` CLI must be installed and on PATH for `--session` and interactive picker modes.
+- When using the OpenCode V2 extractor, the `opencode2` CLI must be installed and on PATH.
 - When using the Claude Code extractor, this project reads `~/.claude/projects` directly.
 - When using summarization, the `llm` CLI must be installed.
 
@@ -86,7 +87,8 @@ Scroll down to the Usage section if you want to know more.
 
 These are the supported formats. This is a work in progress.
 
-- **OpenCode JSON exports** (primary format)
+- **OpenCode JSON exports** (primary format, V1)
+- **OpenCode V2 JSON exports** via `opencode2 export` (experimental)
 - **Claude Code JSONL exports** (experimental)
 - **Pi JSONL exports** (experimental)
 - **Kagi Assistant JSON exports**
@@ -96,7 +98,7 @@ Open WebUI exports may contain multiple conversation branches; only the currentl
 
 Claude Code sessions are read directly from `~/.claude/projects`. Subagent conversations are inlined into the parent session as tool-call blocks.
 
-OpenCode sessions that spawn subagents are exported as a family: the parent HTML links to each subagent session and the subagent HTML links back to the parent. Choosing a parent session in the picker or via `--session` exports the parent and all of its subagents.
+OpenCode and OpenCode V2 sessions that spawn subagents (or forks) are exported as a family: the parent HTML links to each child session and the child HTML links back to the parent. Choosing a parent session in the picker or via `--session` exports the parent and all of its children.
 
 Additional formats can be added by implementing an extractor in `src/extractors/` and registering it in `src/extractors/index.ts`.
 
@@ -123,6 +125,16 @@ oc-export --extractor claude
 # Produces: session-id.jsonl, session-id.html
 
 oc-export --extractor claude --output report
+# Produces: report.jsonl, report.html
+```
+
+Use OpenCode V2 (opencode2) sessions:
+
+```bash
+oc-export --extractor opencode2
+# Produces: session-id.jsonl, session-id.html
+
+oc-export --extractor opencode2 --output report
 # Produces: report.jsonl, report.html
 ```
 
@@ -156,6 +168,11 @@ oc-export --session abc123 --output report
 # With the Claude Code source:
 oc-export --extractor claude --session abc123
 oc-export --extractor claude --session abc123 --output report
+# Produces: report.jsonl, report.html
+
+# With the OpenCode V2 source:
+oc-export --extractor opencode2 --session abc123
+oc-export --extractor opencode2 --session abc123 --output report
 # Produces: report.jsonl, report.html
 ```
 
@@ -229,7 +246,7 @@ oc-export --config ~/.oc-export.jsonc session.json
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `raw` | boolean | `false` | Skip sanitization by default |
-| `extractor` | string | `opencode` | Default session source: `opencode` or `claude` |
+| `extractor` | string | `opencode` | Default session source: `opencode`, `opencode2`, `claude`, or `pi` |
 | `username` | string | — | Display name used on the user-turn badge, rendered in uppercase |
 | `picker.databasePath` | string | `~/.local/share/opencode/opencode.db` | Path to the OpenCode SQLite database |
 | `picker.limit` | number | `20` | Number of recent sessions shown in the interactive picker |

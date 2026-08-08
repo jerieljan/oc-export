@@ -18,9 +18,9 @@
     },
     "extractor": {
       "type": "string",
-      "enum": ["opencode", "claude", "pi"],
+      "enum": ["opencode", "opencode2", "claude", "pi"],
       "default": "opencode",
-      "description": "Default session source. Valid values are 'opencode', 'claude', and 'pi'."
+      "description": "Default session source. Valid values are 'opencode', 'opencode2', 'claude', and 'pi'."
     },
     "username": {
       "type": "string",

@@ -3,6 +3,7 @@ import type { Extractor } from "./types.js";
 import { kagiExtractor } from "./kagi.js";
 import { claudeExtractor } from "./claude.js";
 import { opencodeExtractor } from "./opencode.js";
+import { opencode2Extractor } from "./opencode2.js";
 import { openWebUIExtractor } from "./openwebui.js";
 import { piExtractor } from "./pi.js";
 
@@ -11,6 +12,7 @@ const extractors: Extractor[] = [
   kagiExtractor,
   piExtractor,
   claudeExtractor,
+  opencode2Extractor,
   opencodeExtractor,
 ];
 

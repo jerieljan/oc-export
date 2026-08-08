@@ -1,9 +1,10 @@
 import type { Source } from "./types.js";
 import { claudeSource } from "./claude.js";
 import { opencodeSource } from "./opencode.js";
+import { opencode2Source } from "./opencode2.js";
 import { piSource } from "./pi.js";
 
-const sources: Source[] = [opencodeSource, claudeSource, piSource];
+const sources: Source[] = [opencodeSource, opencode2Source, claudeSource, piSource];
 
 export function registerSource(source: Source): void {
   sources.unshift(source);
@@ -24,5 +25,5 @@ export function getSource(name: string): Source {
   return source;
 }
 
-export { opencodeSource, claudeSource };
+export { opencodeSource, opencode2Source, claudeSource };
 export type { Source, SourceOptions } from "./types.js";
