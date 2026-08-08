@@ -13,8 +13,8 @@
   // was passed unless you explicitly use --no-raw on the command line.
   "raw": false,
 
-  // Default session source. Valid values are "opencode", "claude", and "pi".
-  // Can be overridden with --extractor on the command line.
+  // Default session source. Valid values are "opencode", "opencode2", "claude",
+  // and "pi". Can be overridden with --extractor on the command line.
   "extractor": "opencode",
 
   // Display name used on the user-turn badge in exported HTML. When set,
