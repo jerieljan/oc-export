@@ -262,6 +262,7 @@ oc-export --config ~/.oc-export.jsonc session.json
 | `summarize.toolsPrompt` | string | — | Custom system prompt for tool-call summaries |
 | `summarize.sessionSummary.enabled` | boolean | `false` | Generate a top-level session summary after per-turn summaries |
 | `summarize.sessionSummary.prompt` | string | — | Custom system prompt for the session summary |
+| `summarize.sessionSummary.collapsed` | boolean | `true` | Start the session summary panel collapsed; set to `false` to expand it by default |
 | `navigation.enabled` | boolean | `true` | Show the bottom turn navigation bar |
 | `navigation.minTurns` | number | `0` | Only show the bar when the session has at least this many turns |
 | `navigation.progressBar` | boolean | `true` | Show a thin progress line at the top of the bar |
@@ -297,6 +298,8 @@ Set `summarize.always` to `true` to summarize by default without passing `--summ
 You can override the prompts with `summarize.prompt` (applies to both block types) or with `summarize.thinkingPrompt` and `summarize.toolsPrompt` for independent control. The type-specific prompts take precedence over `prompt`.
 
 Set `summarize.sessionSummary.enabled` to `true` to add a top-level "Session summary" panel at the start of the HTML. This summary runs after all per-turn summaries are complete, so it summarizes the existing summaries instead of the full tool and thinking traces. You can override its prompt with `summarize.sessionSummary.prompt`.
+
+By default the session summary panel starts collapsed. Set `summarize.sessionSummary.collapsed` to `false` to expand it by default.
 
 *Sanitization runs before summarization, so the model only sees redacted content.* The model ID cannot be supplied via the CLI.
 

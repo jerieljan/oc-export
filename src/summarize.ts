@@ -13,6 +13,8 @@ export interface SummarizeOptions {
   sessionSummary?: boolean;
   /** Override for the session summary prompt. */
   sessionSummaryPrompt?: string;
+  /** When false, render the session summary panel expanded by default. */
+  sessionSummaryCollapsed?: boolean;
 }
 
 export const DEFAULT_THINKING_SUMMARY_PROMPT = `You are summarizing an AI assistant's internal thinking trace.

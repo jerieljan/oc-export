@@ -26,6 +26,7 @@ export interface PiConfig {
 export interface SessionSummaryConfig {
   enabled?: boolean;
   prompt?: string;
+  collapsed?: boolean;
 }
 
 export interface SummarizeConfig {
@@ -184,6 +185,7 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
     if (config.summarize.sessionSummary) {
       validateBoolean(config.summarize.sessionSummary.enabled, "summarize.sessionSummary.enabled");
       validateString(config.summarize.sessionSummary.prompt, "summarize.sessionSummary.prompt");
+      validateBoolean(config.summarize.sessionSummary.collapsed, "summarize.sessionSummary.collapsed");
     }
   }
 

@@ -231,12 +231,15 @@ function renderStats(meta: SessionMeta): string {
 </section>`;
 }
 
-function renderSessionSummary(summary: string): string {
+function renderSessionSummary(summary: string, expanded: boolean): string {
+  const openAttr = expanded ? " open" : "";
   return `<section class="container session-summary">
-  <h2 class="session-summary-heading">Session summary</h2>
-  <div class="session-summary-body">
-    ${md.render(summary)}
-  </div>
+  <details${openAttr}>
+    <summary class="session-summary-heading">Session summary</summary>
+    <div class="session-summary-body">
+      ${md.render(summary)}
+    </div>
+  </details>
 </section>`;
 }
 
@@ -319,6 +322,7 @@ function buildPage(
   navigation?: NavigationConfig,
   parentOutputPath?: string,
   parentTitle?: string,
+  sessionSummaryCollapsed?: boolean,
 ): string {
   const title = escapeHtml(meta.title);
   const created = meta.created ?? formatTimestamp(meta.stats?.createdMs);
@@ -342,8 +346,9 @@ function buildPage(
     .join("\n");
 
   const statsHtml = renderStats(meta);
+  const sessionSummaryExpanded = sessionSummaryCollapsed === false;
   const sessionSummaryHtml = meta.sessionSummary
-    ? renderSessionSummary(meta.sessionSummary)
+    ? renderSessionSummary(meta.sessionSummary, sessionSummaryExpanded)
     : "";
   const parentLinkHtml = meta.parentSessionId
     ? renderParentLink(meta.parentSessionId, parentTitle, parentOutputPath)
@@ -943,6 +948,36 @@ html.dark .theme-icon-light {
 
 .session-summary-body > *:last-child {
   margin-bottom: 0;
+}
+
+.session-summary details > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.session-summary details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.session-summary details > summary::after {
+  content: "+";
+  font-size: 1.1rem;
+  color: var(--accent);
+}
+
+.session-summary details[open] > summary::after {
+  content: "−";
+}
+
+.session-summary details > summary.session-summary-heading {
+  margin: 0;
+}
+
+.session-summary details[open] > summary.session-summary-heading {
+  margin-bottom: 1rem;
 }
 
 .session-id {
@@ -1795,6 +1830,7 @@ export async function renderFile(
     options.navigation,
     options.parentOutputPath,
     options.parentTitle,
+    options.summarize?.sessionSummaryCollapsed,
   );
   const outputPath = options.outputPath
     ? path.resolve(options.outputPath)

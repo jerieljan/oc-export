@@ -76,10 +76,13 @@
     // Optional session-wide summary. When enabled, a "Session summary" panel is
     // added at the top of the HTML after all per-turn summaries are complete.
     "sessionSummary": {
-      "enabled": false
+      "enabled": false,
+
+      // When true, the session summary panel starts collapsed.
+      "collapsed": true
 
       // Optional custom prompt for the session summary.
-      // "prompt": "..."
+      // ,"prompt": "..."
     }
   },
 

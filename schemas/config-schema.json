@@ -124,6 +124,11 @@
             "prompt": {
               "type": "string",
               "description": "Custom system prompt for the session summary."
+            },
+            "collapsed": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true, the session summary panel starts collapsed."
             }
           }
         }

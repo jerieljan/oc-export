@@ -160,6 +160,7 @@ async function main(): Promise<void> {
         toolsPrompt: config.summarize!.toolsPrompt,
         sessionSummary: doSessionSummary,
         sessionSummaryPrompt: config.summarize!.sessionSummary?.prompt,
+        sessionSummaryCollapsed: config.summarize!.sessionSummary?.collapsed ?? true,
       }
     : undefined;
 
