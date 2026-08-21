@@ -25,4 +25,4 @@ export function getSource(name: string): Source {
 }
 
 export type { Source, SourceOptions } from "./types.js";
-export { claudeSource, opencode2Source, opencodeSource };
+export { claudeSource, opencode2Source, opencodeSource, piSource };

@@ -1,50 +1,11 @@
+import type { ClaudeMessage, ClaudeUsage } from "../claude-message.js";
 import { formatTimestamp } from "../format.js";
 import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
 import type { Extractor } from "./types.js";
 
-// Claude Code JSONL message format.
-// The source layer normalizes the raw JSONL (inlines subagents, resolves
-// persisted outputs) before passing it here.
-interface ClaudeMessage {
-  type?: string;
-  sessionId?: string;
-  uuid?: string;
-  parentUuid?: string | null;
-  promptId?: string;
-  agentId?: string;
-  isSidechain?: boolean;
-  timestamp?: string;
-  message?: {
-    role?: string;
-    content?: unknown;
-    model?: string;
-    id?: string;
-    type?: string;
-  };
-  attachment?: {
-    type?: string;
-    filename?: string;
-    content?: unknown;
-    displayPath?: string;
-  };
-  subtype?: string;
-  durationMs?: number;
-  messageCount?: number;
-  aiTitle?: string;
-  usage?: ClaudeUsage;
-  [key: string]: unknown;
-}
-
-interface ClaudeUsage {
-  input_tokens?: number;
-  output_tokens?: number;
-  cache_creation_input_tokens?: number;
-  cache_read_input_tokens?: number;
-  server_tool_use?: {
-    web_search_requests?: number;
-    web_fetch_requests?: number;
-  };
-}
+// Claude Code JSONL export. The source layer normalizes the raw JSONL
+// (inlines subagents, resolves persisted outputs) before passing it here;
+// the raw message shape lives in src/claude-message.ts.
 
 interface ContentBlock {
   type?: string;
@@ -523,9 +484,7 @@ function parseJsonlSession(data: unknown): {
       durations.set(message.promptId, message.durationMs ?? 0);
     }
     if (message.type === "assistant") {
-      const u = (message.message as Record<string, unknown> | undefined)?.usage as
-        | ClaudeUsage
-        | undefined;
+      const u = message.message?.usage;
       if (!u) continue;
       if (u.input_tokens) usage.input_tokens! += u.input_tokens;
       if (u.output_tokens) usage.output_tokens! += u.output_tokens;

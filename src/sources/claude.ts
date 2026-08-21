@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { ClaudeMessage } from "../claude-message.js";
+import { expandHome } from "../util.js";
 import type { SessionRow, Source, SourceOptions } from "./types.js";
 
 const DEFAULT_PROJECTS_PATH = path.join(os.homedir(), ".claude/projects");
@@ -22,40 +24,6 @@ interface ClaudeSessionIndex {
   version: number;
   entries: ClaudeSessionIndexEntry[];
   originalPath?: string;
-}
-
-interface ClaudeMessage {
-  type?: string;
-  sessionId?: string;
-  uuid?: string;
-  parentUuid?: string | null;
-  promptId?: string;
-  agentId?: string;
-  isSidechain?: boolean;
-  timestamp?: string;
-  message?: {
-    role?: string;
-    content?: unknown;
-    model?: string;
-    id?: string;
-    type?: string;
-  };
-  attachment?: {
-    type?: string;
-    filename?: string;
-    content?: unknown;
-    displayPath?: string;
-  };
-  subtype?: string;
-  aiTitle?: string;
-  [key: string]: unknown;
-}
-
-function expandHome(inputPath: string): string {
-  if (inputPath.startsWith("~/") || inputPath === "~") {
-    return path.join(os.homedir(), inputPath.slice(1));
-  }
-  return inputPath;
 }
 
 function isMetaPrompt(content: string): boolean {
@@ -234,7 +202,16 @@ function inferSessionFromJsonl(filePath: string): ClaudeSessionIndexEntry | null
   }
 }
 
+// Scanning a projects directory reads every session file, so cache the last
+// result per process. The CLI is short-lived; findSessionById and
+// exportSessionToFile both need the entries and would otherwise rescan.
+let sessionEntriesCache: { projectsPath: string; entries: ClaudeSessionIndexEntry[] } | null = null;
+
 function listSessionEntries(projectsPath: string): ClaudeSessionIndexEntry[] {
+  if (sessionEntriesCache?.projectsPath === projectsPath) {
+    return sessionEntriesCache.entries;
+  }
+
   const entries: ClaudeSessionIndexEntry[] = [];
   const seen = new Set<string>();
 
@@ -265,6 +242,7 @@ function listSessionEntries(projectsPath: string): ClaudeSessionIndexEntry[] {
     }
   }
 
+  sessionEntriesCache = { projectsPath, entries };
   return entries;
 }
 

@@ -1,5 +1,12 @@
 import { formatTimestamp } from "../format.js";
 import type { SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "../types.js";
+import {
+  buildAssistantHeader,
+  collectSubagentLink,
+  computeOpencodeStats,
+  joinContent,
+  parseTaskState,
+} from "./opencode-shared.js";
 import type { Extractor } from "./types.js";
 
 // JSON export format produced by Opencode.
@@ -74,94 +81,35 @@ interface JsonToolState {
 }
 
 function isJsonSession(data: unknown): data is JsonSession {
-  return (
-    typeof data === "object" &&
-    data !== null &&
-    "info" in data &&
-    typeof (data as { info: unknown }).info === "object" &&
-    (data as { info: unknown }).info !== null &&
-    "messages" in data &&
-    Array.isArray((data as { messages: unknown }).messages)
-  );
+  if (typeof data !== "object" || data === null) {
+    return false;
+  }
+  const obj = data as { info?: unknown; messages?: unknown };
+  if (typeof obj.info !== "object" || obj.info === null) {
+    return false;
+  }
+  if (!Array.isArray(obj.messages)) {
+    return false;
+  }
+  // V1 messages wrap their payload in an `info` field, while V2 messages
+  // carry a top-level `type` field instead. Requiring `info` on every message
+  // keeps this matcher independent of extractor registration order.
+  return obj.messages.every((message) => {
+    return typeof message === "object" && message !== null && "info" in message;
+  });
 }
 
 function computeStats(session: JsonSession): SessionStats {
   const info = session.info;
-  const createdMs = info.time?.created;
-  const updatedMs = info.time?.updated;
-  const durationMs =
-    createdMs !== undefined && updatedMs !== undefined ? updatedMs - createdMs : undefined;
-
-  let cost: number | undefined = info.cost !== undefined ? info.cost : undefined;
-  if (cost === undefined) {
-    const sum = session.messages.reduce((acc, message) => {
-      return acc + (message.info.cost ?? 0);
-    }, 0);
-    cost = sum > 0 ? sum : undefined;
-  }
-
-  let tokensInput: number | undefined;
-  let tokensOutput: number | undefined;
-  let tokensReasoning: number | undefined;
-  let tokensCacheRead: number | undefined;
-
-  if (info.tokens) {
-    tokensInput = info.tokens.input;
-    tokensOutput = info.tokens.output;
-    tokensReasoning = info.tokens.reasoning;
-    tokensCacheRead = info.tokens.cache?.read;
-  } else {
-    let hasTokenData = false;
-    const totals = session.messages.reduce(
-      (acc, message) => {
-        const tokens = message.info.tokens;
-        if (tokens) {
-          hasTokenData = true;
-          acc.input += tokens.input ?? 0;
-          acc.output += tokens.output ?? 0;
-          acc.reasoning += tokens.reasoning ?? 0;
-          acc.cacheRead += tokens.cache?.read ?? 0;
-        }
-        return acc;
-      },
-      { input: 0, output: 0, reasoning: 0, cacheRead: 0 },
-    );
-    if (hasTokenData) {
-      tokensInput = totals.input;
-      tokensOutput = totals.output;
-      tokensReasoning = totals.reasoning;
-      tokensCacheRead = totals.cacheRead;
-    }
-  }
-
-  const totalMessages = session.messages.length;
-  const userMessages = session.messages.filter((message) => message.info.role === "user").length;
-  const assistantMessages = totalMessages - userMessages;
-
-  let reasoningParts = 0;
-  let toolParts = 0;
-  for (const message of session.messages) {
-    for (const part of message.parts) {
-      if (part.type === "reasoning") reasoningParts++;
-      else if (part.type === "tool") toolParts++;
-    }
-  }
-
-  return {
-    createdMs,
-    updatedMs,
-    durationMs,
-    cost,
-    tokensInput,
-    tokensOutput,
-    tokensReasoning,
-    tokensCacheRead,
-    totalMessages,
-    userMessages,
-    assistantMessages,
-    reasoningParts,
-    toolParts,
-  };
+  return computeOpencodeStats(
+    { cost: info.cost, tokens: info.tokens, time: info.time },
+    session.messages.map((message) => ({
+      role: message.info.role,
+      cost: message.info.cost,
+      tokens: message.info.tokens,
+      parts: message.parts,
+    })),
+  );
 }
 
 function parseJsonSession(session: JsonSession): {
@@ -203,7 +151,13 @@ function parseJsonSession(session: JsonSession): {
     if (!turn) {
       turn = {
         role: "assistant",
-        header: buildAssistantHeader(message.info),
+        header: buildAssistantHeader({
+          agent: message.info.mode,
+          modelID: message.info.modelID,
+          providerID: message.info.providerID,
+          createdMs: message.info.time?.created,
+          completedMs: message.info.time?.completed,
+        }),
         thinking: [],
         tools: [],
         content: "",
@@ -229,15 +183,7 @@ function parseJsonSession(session: JsonSession): {
           if (part.tool && part.state) {
             const tool = parseJsonTool(part.tool, part.state);
             turn.tools.push(tool);
-            if (tool.subagent) {
-              if (!subagentsById.has(tool.subagent.sessionId)) {
-                subagentsById.set(tool.subagent.sessionId, {
-                  sessionId: tool.subagent.sessionId,
-                  title: tool.subagent.title,
-                  description: tool.subagent.description,
-                });
-              }
-            }
+            collectSubagentLink(subagentsById, tool);
           }
           break;
         case "step-start":
@@ -269,40 +215,6 @@ function collectSyntheticParts(parts: JsonPart[]): string[] {
   return parts.filter((p) => p.type === "text" && p.text && p.synthetic).map((p) => p.text!);
 }
 
-function joinContent(existing: string, addition: string): string {
-  existing = existing.trim();
-  addition = addition.trim();
-  if (!existing) return addition;
-  if (!addition) return existing;
-  return `${existing}\n\n${addition}`;
-}
-
-function buildAssistantHeader(info: JsonMessageInfo): string | undefined {
-  const bits: string[] = [];
-  if (info.mode) bits.push(info.mode);
-  if (info.modelID) {
-    const modelLabel = info.providerID ? `${info.providerID}/${info.modelID}` : info.modelID;
-    bits.push(modelLabel);
-  }
-  if (info.time?.created && info.time?.completed) {
-    const durationMs = info.time.completed - info.time.created;
-    if (durationMs >= 0) {
-      bits.push(`${(durationMs / 1000).toFixed(1)}s`);
-    }
-  }
-  return bits.length > 0 ? bits.join(" · ") : undefined;
-}
-
-function parseTaskState(state: JsonToolState): {
-  stateValue?: string;
-  sessionId?: string;
-} {
-  if (!state.output) return {};
-  const match = state.output.match(/<task\s+id="([^"]+)"\s+state="([^"]+)"/);
-  if (!match) return {};
-  return { sessionId: match[1], stateValue: match[2] };
-}
-
 function parseJsonTool(toolName: string, state: JsonToolState): ToolCall {
   const input = state.input ? JSON.stringify(state.input, null, 2) : "";
   let output = state.output || "";
@@ -313,7 +225,7 @@ function parseJsonTool(toolName: string, state: JsonToolState): ToolCall {
   const tool: ToolCall = { name: toolName, input, output };
 
   if (toolName === "task" && state.metadata?.sessionId) {
-    const task = parseTaskState(state);
+    const task = parseTaskState(state.output ?? "");
     let title: string | undefined = state.title;
     let description: string | undefined;
     if (typeof state.input === "object" && state.input !== null) {

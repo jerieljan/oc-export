@@ -23,6 +23,7 @@
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
+    "test": "bun test && bun run test:config-schema",
     "test:config-schema": "bun scripts/validate-config-schema.ts"
   },
   "keywords": [
@@ -46,7 +47,7 @@
   },
   "homepage": "https://github.com/jerieljan/oc-export#readme",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",

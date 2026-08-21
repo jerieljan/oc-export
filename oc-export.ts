@@ -1,122 +1,28 @@
 #!/usr/bin/env node
 import path from "node:path";
-import { DEFAULT_CONFIG_PATH, loadConfig } from "./src/config.js";
+import { parseArgs, showHelp } from "./src/cli-args.js";
+import { loadConfig } from "./src/config.js";
 import { pickInteractive, pickSessionById } from "./src/pick.js";
 import { renderFile, renderFiles } from "./src/render.js";
-import { which } from "./src/util.js";
-
-function showHelp(): void {
-  console.log(`Usage: oc-export [options] [file.json ...]
-
-Render chat sessions to standalone HTML files.
-
-Options:
-  --extractor <name>  Session source: opencode (default), opencode2, claude, or pi
-  --session <id>      Export a session by full ID or last 8 characters and render it
-  --output <name>     Rename both output files to <name>.jsonl and <name>.html
-  --raw               Skip sanitization
-  --no-raw            Enable sanitization (default, overrides raw: true in config)
-  --summarize         Summarize thinking and tool-call blocks using llm
-  --config <path>     Use a custom config file (default: ${DEFAULT_CONFIG_PATH})
-  --help, -h          Show this help message
-
-Config file:
-  Settings are read from ${DEFAULT_CONFIG_PATH} if it exists.
-  CLI flags override config values. Config values override defaults.
-
-Examples:
-  oc-export                               # interactive picker (default: opencode)
-  oc-export --extractor claude            # interactive picker for Claude Code
-  oc-export --extractor pi                # interactive picker for Pi
-  oc-export --extractor opencode2         # interactive picker for OpenCode V2
-  oc-export --extractor claude --session abc123
-  oc-export --extractor pi --session abc123
-  oc-export --extractor opencode2 --session abc123
-  oc-export --output report               # picker with custom output names
-  oc-export session.jsonl                 # render a JSONL file
-  oc-export session.json                # render a JSON file
-  oc-export --config ~/.oc-export.jsonc
-`);
-}
-
-interface ParsedArgs {
-  extractor?: string;
-  raw?: boolean;
-  config?: string;
-  session?: string;
-  output?: string;
-  summarize?: boolean;
-  files: string[];
-}
-
-function parseArgs(argv: string[]): ParsedArgs {
-  const files: string[] = [];
-  let extractor: string | undefined;
-  let raw: boolean | undefined;
-  let config: string | undefined;
-  let session: string | undefined;
-  let output: string | undefined;
-  let summarize: boolean | undefined;
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--help" || arg === "-h") {
-      showHelp();
-      process.exit(0);
-    } else if (arg === "--extractor") {
-      const next = argv[++i];
-      if (!next) {
-        console.error("Error: --extractor requires a value");
-        process.exit(1);
-      }
-      extractor = next;
-    } else if (arg === "--raw") {
-      raw = true;
-    } else if (arg === "--no-raw") {
-      raw = false;
-    } else if (arg === "--summarize") {
-      summarize = true;
-    } else if (arg === "--config") {
-      const next = argv[++i];
-      if (!next) {
-        console.error("Error: --config requires a value");
-        process.exit(1);
-      }
-      config = next;
-    } else if (arg === "--session") {
-      const next = argv[++i];
-      if (!next) {
-        console.error("Error: --session requires a value");
-        process.exit(1);
-      }
-      session = next;
-    } else if (arg === "--output") {
-      const next = argv[++i];
-      if (!next) {
-        console.error("Error: --output requires a value");
-        process.exit(1);
-      }
-      output = next;
-    } else if (arg.startsWith("-")) {
-      console.error(`Error: Unknown option ${arg}`);
-      process.exit(1);
-    } else {
-      files.push(arg);
-    }
-  }
-
-  return { extractor, raw, config, session, output, summarize, files };
-}
+import { resolveOutputBase, which } from "./src/util.js";
 
 function htmlOutputPath(outputArg: string): string {
-  const resolved = path.resolve(outputArg);
-  const dir = path.dirname(resolved);
-  const base = path.basename(resolved, path.extname(resolved));
+  const { dir, base } = resolveOutputBase(outputArg);
   return path.join(dir, `${base}.html`);
 }
 
 async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+  const parsed = parseArgs(process.argv.slice(2));
+  if (parsed.help) {
+    showHelp();
+    return;
+  }
+  if (parsed.error !== undefined) {
+    console.error(`Error: ${parsed.error}`);
+    process.exit(1);
+  }
+  const args = parsed.args;
+
   const config = loadConfig(args.config);
   if (args.extractor) {
     config.extractor = args.extractor;

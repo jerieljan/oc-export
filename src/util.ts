@@ -1,6 +1,65 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+
+/** Last 8 characters of a session ID, used for short labels and filenames. */
+export function last8(id: string): string {
+  return id.slice(-8);
+}
+
+/** Expand a leading ~/ to the user's home directory. */
+export function expandHome(inputPath: string): string {
+  if (inputPath.startsWith("~/") || inputPath === "~") {
+    return path.join(os.homedir(), inputPath.slice(1));
+  }
+  return inputPath;
+}
+
+/**
+ * Resolve an --output argument such as "report", "out/report", or
+ * "out/report.html" into its directory and extension-less base name, so
+ * callers can derive sibling output files that share one base name.
+ */
+export function resolveOutputBase(outputBase: string): { dir: string; base: string } {
+  const resolved = path.resolve(outputBase);
+  return {
+    dir: path.dirname(resolved),
+    base: path.basename(resolved, path.extname(resolved)),
+  };
+}
+
+/**
+ * Run async task thunks with bounded concurrency and return the results in
+ * task order. First failure rejects the returned promise; remaining workers
+ * stop picking up new tasks.
+ */
+export async function runWithLimit<T>(
+  tasks: readonly (() => Promise<T>)[],
+  limit: number,
+): Promise<T[]> {
+  const results = new Array<T>(tasks.length);
+  if (tasks.length === 0) return results;
+
+  let next = 0;
+  let failed = false;
+
+  const workerCount = Math.max(1, Math.min(limit, tasks.length));
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (!failed && next < tasks.length) {
+      const index = next++;
+      try {
+        results[index] = await tasks[index]!();
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
 
 function isExecutable(filePath: string): boolean {
   try {

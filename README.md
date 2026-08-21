@@ -43,7 +43,7 @@ These options are configured either via flags or the config.jsonc file. See the 
 
 ### Requirements
 
-- Node 18+ **or** a working Bun setup.
+- Node 20+ **or** a working Bun setup.
 - The `opencode` CLI must be installed and on PATH for `--session` and interactive picker modes.
 - When using the OpenCode V2 extractor, the `opencode2` CLI must be installed and on PATH.
 - When using the Claude Code extractor, this project reads `~/.claude/projects` directly.

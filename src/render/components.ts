@@ -1,5 +1,5 @@
 import MarkdownIt from "markdown-it";
-import type { NavigationConfig } from "../config.js";
+import type { ResolvedNavigationConfig } from "../config.js";
 import { formatTimestamp, formatTimestampIsoWithTimezone, formatTokens } from "../format.js";
 import type {
   ExtensionState,
@@ -9,6 +9,7 @@ import type {
   ToolCall,
   Turn,
 } from "../types.js";
+import { last8 } from "../util.js";
 
 const md = new MarkdownIt({
   html: false,
@@ -16,10 +17,6 @@ const md = new MarkdownIt({
   typographer: false,
   breaks: false,
 });
-
-function last8(id: string): string {
-  return id.slice(-8);
-}
 
 function sessionHtmlPath(sessionId: string): string {
   return `./session-${last8(sessionId)}.html`;
@@ -153,7 +150,7 @@ export function renderParentLink(
   parentOutputPath?: string,
 ): string {
   const href = escapeHtml(parentOutputPath ?? sessionHtmlPath(parentSessionId));
-  const text = parentTitle ? parentTitle : parentSessionId.slice(-8);
+  const text = parentTitle ? parentTitle : last8(parentSessionId);
   return `
 <div class="parent-link">
   <a href="${href}">← Parent session: ${escapeHtml(text)}</a>
@@ -164,7 +161,7 @@ export function renderSubagentRelations(subagents: SubagentLink[]): string {
   if (subagents.length === 0) return "";
   const items = subagents
     .map((sub) => {
-      const title = sub.title || sub.sessionId.slice(-8);
+      const title = sub.title || last8(sub.sessionId);
       const description = sub.description
         ? `<p class="subagent-relation-description">${escapeHtml(sub.description)}</p>`
         : "";
@@ -185,14 +182,7 @@ export function renderSubagentRelations(subagents: SubagentLink[]): string {
 </section>`;
 }
 
-export function renderTurnScrubber(turns: Turn[], navigation?: NavigationConfig): string {
-  const nav = {
-    enabled: navigation?.enabled ?? true,
-    minTurns: navigation?.minTurns ?? 0,
-    progressBar: navigation?.progressBar ?? true,
-    roleColor: navigation?.roleColor ?? false,
-  };
-
+export function renderTurnScrubber(turns: Turn[], nav: ResolvedNavigationConfig): string {
   if (!nav.enabled || turns.length < nav.minTurns) {
     return "";
   }
@@ -324,7 +314,7 @@ function renderTurnReferences(refs: Reference[], turnIndex: number): string {
 
 function renderSubagentTool(tool: ToolCall): string {
   const sub = tool.subagent!;
-  const title = sub.title || sub.sessionId.slice(-8);
+  const title = sub.title || last8(sub.sessionId);
   const state = sub.state ? `<span class="subagent-state">${escapeHtml(sub.state)}</span>` : "";
   const description = sub.description
     ? `<p class="subagent-description">${escapeHtml(sub.description)}</p>`

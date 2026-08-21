@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import stripJsonComments from "strip-json-comments";
+import { expandHome } from "./util.js";
 
 export const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".config/oc-export/config.jsonc");
 
@@ -41,6 +42,19 @@ export interface NavigationConfig {
   minTurns?: number;
   progressBar?: boolean;
   roleColor?: boolean;
+}
+
+/** NavigationConfig with every field resolved to its effective value. */
+export type ResolvedNavigationConfig = Required<NavigationConfig>;
+
+// Single owner of navigation defaults; the renderer consumes resolved values.
+export function resolveNavigationConfig(navigation?: NavigationConfig): ResolvedNavigationConfig {
+  return {
+    enabled: navigation?.enabled ?? true,
+    minTurns: navigation?.minTurns ?? 0,
+    progressBar: navigation?.progressBar ?? true,
+    roleColor: navigation?.roleColor ?? false,
+  };
 }
 
 export interface UserConfig {
@@ -87,13 +101,6 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   claude: DEFAULT_CLAUDE_CONFIG,
   pi: DEFAULT_PI_CONFIG,
 };
-
-function expandHomeDir(inputPath: string): string {
-  if (inputPath.startsWith("~/") || inputPath === "~") {
-    return path.join(os.homedir(), inputPath.slice(1));
-  }
-  return inputPath;
-}
 
 function validateBoolean(value: unknown, key: string): asserts value is boolean | undefined {
   if (value !== undefined && typeof value !== "boolean") {
@@ -196,19 +203,19 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
     username: config.username,
     picker: {
       databasePath: config.picker?.databasePath
-        ? expandHomeDir(config.picker.databasePath)
+        ? expandHome(config.picker.databasePath)
         : DEFAULT_PICKER_CONFIG.databasePath,
       limit: pickerLimit,
     },
     claude: {
       projectsPath: config.claude?.projectsPath
-        ? expandHomeDir(config.claude.projectsPath)
+        ? expandHome(config.claude.projectsPath)
         : DEFAULT_CLAUDE_CONFIG.projectsPath,
       limit: config.claude?.limit ?? pickerLimit,
     },
     pi: {
       sessionsPath: config.pi?.sessionsPath
-        ? expandHomeDir(config.pi.sessionsPath)
+        ? expandHome(config.pi.sessionsPath)
         : DEFAULT_PI_CONFIG.sessionsPath,
       limit: config.pi?.limit ?? pickerLimit,
     },

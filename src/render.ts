@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { NavigationConfig } from "./config.js";
+import { type NavigationConfig, resolveNavigationConfig } from "./config.js";
 import { extractSession } from "./extractors/index.js";
 import {
   formatCost,
@@ -145,12 +145,7 @@ function buildPage(
     : "";
   const subagentRelationsHtml =
     meta.subagents && meta.subagents.length > 0 ? renderSubagentRelations(meta.subagents) : "";
-  const navConfig = {
-    enabled: navigation?.enabled ?? true,
-    minTurns: navigation?.minTurns ?? 0,
-    progressBar: navigation?.progressBar ?? true,
-    roleColor: navigation?.roleColor ?? false,
-  };
+  const navConfig = resolveNavigationConfig(navigation);
   const navHtml = renderTurnScrubber(turns, navConfig);
   const activeNav = navHtml !== "" ? navConfig : undefined;
 

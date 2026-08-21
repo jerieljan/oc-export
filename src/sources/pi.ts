@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { expandHome } from "../util.js";
 import type { SessionRow, Source, SourceOptions } from "./types.js";
 
 const DEFAULT_SESSIONS_PATH = path.join(os.homedir(), ".pi/agent/sessions");
@@ -11,13 +12,6 @@ interface PiSessionFile {
   title: string;
   directory: string;
   time_updated: number;
-}
-
-function expandHome(inputPath: string): string {
-  if (inputPath.startsWith("~/") || inputPath === "~") {
-    return path.join(os.homedir(), inputPath.slice(1));
-  }
-  return inputPath;
 }
 
 function getSessionsPath(options: SourceOptions): string {

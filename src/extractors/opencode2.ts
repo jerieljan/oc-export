@@ -1,5 +1,12 @@
 import { formatTimestamp } from "../format.js";
 import type { SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "../types.js";
+import {
+  buildAssistantHeader,
+  collectSubagentLink,
+  computeOpencodeStats,
+  joinContent,
+  parseTaskState,
+} from "./opencode-shared.js";
 import type { Extractor } from "./types.js";
 
 // JSON export format produced by opencode2 (OpenCode V2).
@@ -105,90 +112,15 @@ function isJsonSession(data: unknown): data is JsonSession {
 
 function computeStats(session: JsonSession): SessionStats {
   const info = session.info;
-  const createdMs = info.time?.created;
-  const updatedMs = info.time?.updated;
-  const durationMs =
-    createdMs !== undefined && updatedMs !== undefined ? updatedMs - createdMs : undefined;
-
-  let cost: number | undefined = info.cost !== undefined ? info.cost : undefined;
-  if (cost === undefined) {
-    const sum = session.messages.reduce((acc, message) => {
-      return acc + (message.cost ?? 0);
-    }, 0);
-    cost = sum > 0 ? sum : undefined;
-  }
-
-  let tokensInput: number | undefined;
-  let tokensOutput: number | undefined;
-  let tokensReasoning: number | undefined;
-  let tokensCacheRead: number | undefined;
-
-  if (info.tokens) {
-    tokensInput = info.tokens.input;
-    tokensOutput = info.tokens.output;
-    tokensReasoning = info.tokens.reasoning;
-    tokensCacheRead = info.tokens.cache?.read;
-  } else {
-    let hasTokenData = false;
-    const totals = session.messages.reduce(
-      (acc, message) => {
-        const tokens = message.tokens;
-        if (tokens) {
-          hasTokenData = true;
-          acc.input += tokens.input ?? 0;
-          acc.output += tokens.output ?? 0;
-          acc.reasoning += tokens.reasoning ?? 0;
-          acc.cacheRead += tokens.cache?.read ?? 0;
-        }
-        return acc;
-      },
-      { input: 0, output: 0, reasoning: 0, cacheRead: 0 },
-    );
-    if (hasTokenData) {
-      tokensInput = totals.input;
-      tokensOutput = totals.output;
-      tokensReasoning = totals.reasoning;
-      tokensCacheRead = totals.cacheRead;
-    }
-  }
-
-  const totalMessages = session.messages.length;
-  const userMessages = session.messages.filter((message) => message.type === "user").length;
-  const assistantMessages = totalMessages - userMessages;
-
-  let reasoningParts = 0;
-  let toolParts = 0;
-  for (const message of session.messages) {
-    if (!message.content) continue;
-    for (const part of message.content) {
-      if (part.type === "reasoning") reasoningParts++;
-      else if (part.type === "tool") toolParts++;
-    }
-  }
-
-  return {
-    createdMs,
-    updatedMs,
-    durationMs,
-    cost,
-    tokensInput,
-    tokensOutput,
-    tokensReasoning,
-    tokensCacheRead,
-    totalMessages,
-    userMessages,
-    assistantMessages,
-    reasoningParts,
-    toolParts,
-  };
-}
-
-function joinContent(existing: string, addition: string): string {
-  existing = existing.trim();
-  addition = addition.trim();
-  if (!existing) return addition;
-  if (!addition) return existing;
-  return `${existing}\n\n${addition}`;
+  return computeOpencodeStats(
+    { cost: info.cost, tokens: info.tokens, time: info.time },
+    session.messages.map((message) => ({
+      role: message.type,
+      cost: message.cost,
+      tokens: message.tokens,
+      parts: message.content ?? [],
+    })),
+  );
 }
 
 function collectToolOutput(state: JsonToolState): string {
@@ -199,15 +131,6 @@ function collectToolOutput(state: JsonToolState): string {
       .join("\n\n");
   }
   return state.output || "";
-}
-
-function parseTaskState(output: string): {
-  stateValue?: string;
-  sessionId?: string;
-} {
-  const match = output.match(/<task\s+id="([^"]+)"\s+state="([^"]+)"/);
-  if (!match) return {};
-  return { sessionId: match[1], stateValue: match[2] };
 }
 
 function parseJsonTool(toolName: string, state: JsonToolState): ToolCall {
@@ -246,24 +169,6 @@ function parseJsonTool(toolName: string, state: JsonToolState): ToolCall {
   return tool;
 }
 
-function buildAssistantHeader(message: JsonMessage): string | undefined {
-  const bits: string[] = [];
-  if (message.agent) bits.push(message.agent);
-  if (message.model?.id) {
-    const modelLabel = message.model.providerID
-      ? `${message.model.providerID}/${message.model.id}`
-      : message.model.id;
-    bits.push(modelLabel);
-  }
-  if (message.time?.created && message.time?.completed) {
-    const durationMs = message.time.completed - message.time.created;
-    if (durationMs >= 0) {
-      bits.push(`${(durationMs / 1000).toFixed(1)}s`);
-    }
-  }
-  return bits.length > 0 ? bits.join(" · ") : undefined;
-}
-
 function appendMessageToTurn(
   turn: Turn,
   message: JsonMessage,
@@ -289,15 +194,7 @@ function appendMessageToTurn(
         if (part.name && part.state) {
           const tool = parseJsonTool(part.name, part.state as JsonToolState);
           tools.push(tool);
-          if (tool.subagent) {
-            if (!subagentsById.has(tool.subagent.sessionId)) {
-              subagentsById.set(tool.subagent.sessionId, {
-                sessionId: tool.subagent.sessionId,
-                title: tool.subagent.title,
-                description: tool.subagent.description,
-              });
-            }
-          }
+          collectSubagentLink(subagentsById, tool);
         }
         break;
       default:
@@ -363,7 +260,13 @@ function parseJsonSession(session: JsonSession): {
     if (!currentAssistantTurn) {
       currentAssistantTurn = {
         role: "assistant",
-        header: buildAssistantHeader(message),
+        header: buildAssistantHeader({
+          agent: message.agent,
+          modelID: message.model?.id,
+          providerID: message.model?.providerID,
+          createdMs: message.time?.created,
+          completedMs: message.time?.completed,
+        }),
         thinking: [],
         tools: [],
         content: "",

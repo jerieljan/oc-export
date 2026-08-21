@@ -6,16 +6,13 @@ import { sanitizePathForDisplay } from "./sanitize.js";
 import { getSource, type Source } from "./sources/index.js";
 import type { SessionRow } from "./sources/types.js";
 import type { SummarizeOptions } from "./summarize.js";
+import { last8, resolveOutputBase } from "./util.js";
 
 export interface PickOptions {
   sanitize?: boolean;
   outputBase?: string;
   config?: ResolvedConfig;
   summarize?: SummarizeOptions;
-}
-
-function last8(id: string): string {
-  return id.slice(-8);
 }
 
 function formatDate(ms: number): string {
@@ -37,9 +34,7 @@ function resolveSessionOutputPaths(
 ): { jsonPath: string; htmlPath: string } {
   const suffix = last8(id);
   if (outputBase) {
-    const resolved = path.resolve(outputBase);
-    const dir = path.dirname(resolved);
-    const base = path.basename(resolved, path.extname(resolved));
+    const { dir, base } = resolveOutputBase(outputBase);
     return {
       jsonPath: path.join(dir, `${base}.jsonl`),
       htmlPath: path.join(dir, `${base}.html`),
@@ -163,15 +158,30 @@ export async function pickInteractive(options: PickOptions = {}): Promise<void> 
     output: process.stdout,
   });
 
-  const answer = await rl.question("\nPick a session (number): ");
-  rl.close();
+  let selectedId: string | undefined;
+  try {
+    // Re-prompt until the user enters a valid number; give up on EOF
+    // (Ctrl-D) so a closed stdin doesn't loop forever.
+    while (selectedId === undefined) {
+      let answer: string;
+      try {
+        answer = await rl.question("\nPick a session (number): ");
+      } catch {
+        throw new Error("No selection made.");
+      }
 
-  const num = parseInt(answer.trim(), 10);
-  if (Number.isNaN(num) || num < 1 || num > rows.length) {
-    throw new Error("Invalid selection.");
+      const num = parseInt(answer.trim(), 10);
+      if (!Number.isNaN(num) && num >= 1 && num <= rows.length) {
+        selectedId = rows[num - 1]!.id;
+      } else {
+        console.log(`Please enter a number between 1 and ${rows.length}.`);
+      }
+    }
+  } finally {
+    rl.close();
   }
 
-  await exportAndRenderSession(rows[num - 1]!.id, options);
+  await exportAndRenderSession(selectedId, options);
 }
 
 export async function pickSessionById(

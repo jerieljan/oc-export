@@ -1,5 +1,8 @@
 import type { ToolCall, Turn } from "./types.js";
-import { spawnWithStdin, which } from "./util.js";
+import { last8, runWithLimit, spawnWithStdin, which } from "./util.js";
+
+/** Maximum number of llm processes spawned in parallel. */
+const MAX_SUMMARY_CONCURRENCY = 4;
 
 export interface SummarizeOptions {
   model: string;
@@ -75,7 +78,7 @@ function serializeTools(tools: ToolCall[]): string {
   return tools
     .map((tool, index) => {
       if (tool.subagent) {
-        const title = tool.subagent.title || tool.subagent.sessionId.slice(-8);
+        const title = tool.subagent.title || last8(tool.subagent.sessionId);
         const state = tool.subagent.state ? ` (${tool.subagent.state})` : "";
         return `${index + 1}. Subagent: ${title}${state}`;
       }
@@ -122,31 +125,29 @@ export async function summarizeTurns(turns: Turn[], options: SummarizeOptions): 
     options.thinkingPrompt?.trim() ?? options.prompt?.trim() ?? DEFAULT_THINKING_SUMMARY_PROMPT;
   const toolsPrompt =
     options.toolsPrompt?.trim() ?? options.prompt?.trim() ?? DEFAULT_TOOLS_SUMMARY_PROMPT;
-  const tasks: Promise<void>[] = [];
+  const tasks: (() => Promise<void>)[] = [];
 
   for (const turn of turns) {
     if (turn.role !== "assistant") continue;
 
     if (turn.thinking.length > 0) {
-      tasks.push(
-        (async () => {
-          const content = serializeThinking(turn.thinking);
-          turn.thinkingSummary = await callLlm(options.model, thinkingPrompt, content);
-        })(),
-      );
+      tasks.push(async () => {
+        const content = serializeThinking(turn.thinking);
+        turn.thinkingSummary = await callLlm(options.model, thinkingPrompt, content);
+      });
     }
 
     if (turn.tools.length > 0) {
-      tasks.push(
-        (async () => {
-          const content = serializeTools(turn.tools);
-          turn.toolsSummary = await callLlm(options.model, toolsPrompt, content);
-        })(),
-      );
+      tasks.push(async () => {
+        const content = serializeTools(turn.tools);
+        turn.toolsSummary = await callLlm(options.model, toolsPrompt, content);
+      });
     }
   }
 
-  await Promise.all(tasks);
+  // Bounded pool: one llm process per block, at most MAX_SUMMARY_CONCURRENCY
+  // at a time, so long sessions don't spawn dozens of processes.
+  await runWithLimit(tasks, MAX_SUMMARY_CONCURRENCY);
 }
 
 function serializeSession(turns: Turn[]): string {

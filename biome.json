@@ -19,6 +19,9 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
+      "correctness": {
+        "noUnusedVariables": "error"
+      },
       "style": {
         "noNonNullAssertion": "off"
       }
