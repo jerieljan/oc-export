@@ -1,6 +1,6 @@
-import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import type { SessionRow, Source, SourceOptions } from "./types.js";
 
 const DEFAULT_PROJECTS_PATH = path.join(os.homedir(), ".claude/projects");
@@ -78,7 +78,7 @@ function normalizePrompt(text: string): string {
     .replace(/\\'/g, "'")
     .replace(/\\\\/g, "\\");
   const collapsed = unescaped.replace(/\s+/g, " ").trim();
-  return collapsed.length > 120 ? collapsed.slice(0, 117) + "..." : collapsed;
+  return collapsed.length > 120 ? `${collapsed.slice(0, 117)}...` : collapsed;
 }
 
 function getProjectsPath(options: SourceOptions): string {
@@ -119,9 +119,7 @@ function readSessionIndex(indexPath: string): ClaudeSessionIndex | null {
 function entryToRow(entry: ClaudeSessionIndexEntry): SessionRow {
   return {
     id: entry.sessionId,
-    title: entry.firstPrompt
-      ? normalizePrompt(entry.firstPrompt)
-      : "Claude Code session",
+    title: entry.firstPrompt ? normalizePrompt(entry.firstPrompt) : "Claude Code session",
     directory: entry.projectPath || "",
     time_updated: entry.modified ? Date.parse(entry.modified) : entry.fileMtime,
   };
@@ -141,10 +139,7 @@ export function listSessions(options: SourceOptions): SessionRow[] {
   return rows.slice(0, limit);
 }
 
-export function findSessionById(
-  idOrSuffix: string,
-  options: SourceOptions,
-): SessionRow {
+export function findSessionById(idOrSuffix: string, options: SourceOptions): SessionRow {
   const projectsPath = getProjectsPath(options);
 
   if (!fs.existsSync(projectsPath)) {
@@ -160,9 +155,7 @@ export function findSessionById(
   if (matches.length === 1) return entryToRow(matches[0]!);
 
   if (matches.length > 1) {
-    throw new Error(
-      `Ambiguous suffix "${idOrSuffix}" matches ${matches.length} Claude sessions.`,
-    );
+    throw new Error(`Ambiguous suffix "${idOrSuffix}" matches ${matches.length} Claude sessions.`);
   }
 
   throw new Error(`Claude session not found: ${idOrSuffix}`);
@@ -283,7 +276,9 @@ function findSessionFile(sessionId: string, projectsPath: string): string | null
   }
 
   // Fallback: search filesystem for <sessionId>.jsonl.
-  for (const dirEntry of fs.readdirSync(projectsPath, { withFileTypes: true })) {
+  for (const dirEntry of fs.readdirSync(projectsPath, {
+    withFileTypes: true,
+  })) {
     if (!dirEntry.isDirectory()) continue;
     const candidate = path.join(projectsPath, dirEntry.name, `${sessionId}.jsonl`);
     if (fs.existsSync(candidate)) return candidate;
@@ -292,10 +287,7 @@ function findSessionFile(sessionId: string, projectsPath: string): string | null
   return null;
 }
 
-function resolvePersistedOutput(
-  content: unknown,
-  toolResultsDir: string,
-): unknown {
+function resolvePersistedOutput(content: unknown, _toolResultsDir: string): unknown {
   if (typeof content !== "string") return content;
 
   const match = content.match(/<persisted-output>\s*Full output saved to:\s*(\S+)\s*Preview/i);
@@ -311,15 +303,10 @@ function resolvePersistedOutput(
   }
 }
 
-function inlineSubagents(
-  messages: ClaudeMessage[],
-  subagentsDir: string,
-): ClaudeMessage[] {
+function inlineSubagents(messages: ClaudeMessage[], subagentsDir: string): ClaudeMessage[] {
   if (!fs.existsSync(subagentsDir)) return messages;
 
-  const subagentFiles = fs
-    .readdirSync(subagentsDir)
-    .filter((name) => name.endsWith(".jsonl"));
+  const subagentFiles = fs.readdirSync(subagentsDir).filter((name) => name.endsWith(".jsonl"));
 
   const subagentMap = new Map<string, ClaudeMessage[]>();
   for (const file of subagentFiles) {
@@ -419,9 +406,7 @@ function resolvePersistedOutputs(
 
     if (!Array.isArray(content)) return message;
 
-    const toolUseResult = message.toolUseResult as
-      | Record<string, unknown>
-      | undefined;
+    const toolUseResult = message.toolUseResult as Record<string, unknown> | undefined;
     const persistedOutput = readPersistedOutput(toolUseResult, toolResultsDir);
 
     const newContent = content.map((item: unknown) => {
@@ -506,7 +491,7 @@ export async function exportSessionToFile(
   }
 
   const lines = messages.map((m) => JSON.stringify(m));
-  fs.writeFileSync(outputPath, lines.join("\n") + "\n", "utf-8");
+  fs.writeFileSync(outputPath, `${lines.join("\n")}\n`, "utf-8");
   return outputPath;
 }
 

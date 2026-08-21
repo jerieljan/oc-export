@@ -67,7 +67,13 @@ function sanitizePaths(text: string): string {
     /([A-Za-z]:\\(?:[^\\/?*"<>|\r\n]+(?:\\[^\\/?*"<>|\r\n]+)*))|(?<![A-Za-z0-9_.~])(?!\/\/)(\/(?:[^/\s"<>|]+(?:\/[^/\s"<>|]+)*))/g;
   protectedText = protectedText.replace(
     absolutePathRegex,
-    (match, winPath: string | undefined, unixPath: string | undefined, offset: number, string: string) => {
+    (
+      match,
+      winPath: string | undefined,
+      unixPath: string | undefined,
+      offset: number,
+      string: string,
+    ) => {
       const candidate = winPath ?? unixPath;
       if (!candidate || candidate.length <= 1) return match;
       const rel = relativizePath(candidate);
@@ -87,10 +93,7 @@ function sanitizePaths(text: string): string {
 function replaceKnownPrefix(text: string, prefix: string, allowCwd: boolean): string {
   if (!prefix) return text;
   const escaped = escapeRegex(prefix);
-  const re = new RegExp(
-    escaped + "((?:[/\\\\][^\\n]*?)?)(?=[\\s\"<>(){}\\[\\],;:!?.'`]|$)",
-    "g",
-  );
+  const re = new RegExp(`${escaped}((?:[/\\\\][^\\n]*?)?)(?=[\\s"<>(){}\\[\\],;:!?.'\`]|$)`, "g");
   return text.replace(re, (match, pathPart: string, offset: number) => {
     const tail = text.slice(offset + match.length);
     const fullPath = prefix + pathPart;
@@ -122,11 +125,11 @@ function relativizePath(rawPath: string): string {
     if (!relToCwd.startsWith("..")) {
       const rel = relToCwd.replace(/\\/g, "/");
       if (rel === "") return ".";
-      return rel.startsWith(".") ? rel : "./" + rel;
+      return rel.startsWith(".") ? rel : `./${rel}`;
     }
     const relToHome = path.relative(HOME, normalized);
     if (!relToHome.startsWith("..")) {
-      return "~/" + relToHome.replace(/\\/g, "/");
+      return `~/${relToHome.replace(/\\/g, "/")}`;
     }
 
     // If trailing punctuation made the path look like it is not under cwd or

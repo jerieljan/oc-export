@@ -1,9 +1,8 @@
 import path from "node:path";
-import fs from "node:fs";
 import readline from "node:readline/promises";
 import { DEFAULT_CONFIG, type ResolvedConfig } from "./config.js";
-import { sanitizePathForDisplay } from "./sanitize.js";
 import { renderFile } from "./render.js";
+import { sanitizePathForDisplay } from "./sanitize.js";
 import { getSource, type Source } from "./sources/index.js";
 import type { SessionRow } from "./sources/types.js";
 import type { SummarizeOptions } from "./summarize.js";
@@ -25,7 +24,7 @@ function formatDate(ms: number): string {
 
 function truncateDir(dir: string, max = 40): string {
   if (dir.length <= max) return dir;
-  return "..." + dir.slice(-(max - 3));
+  return `...${dir.slice(-(max - 3))}`;
 }
 
 function getSourceFromConfig(config: ResolvedConfig): Source {
@@ -94,10 +93,7 @@ async function exportAndRenderSingleSession(
   return htmlPath;
 }
 
-export async function exportAndRenderSession(
-  id: string,
-  options: PickOptions = {},
-): Promise<void> {
+export async function exportAndRenderSession(id: string, options: PickOptions = {}): Promise<void> {
   const { config = DEFAULT_CONFIG } = options;
   const source = getSourceFromConfig(config);
   const { jsonPath, htmlPath } = resolveSessionOutputPaths(id, options.outputBase);
@@ -136,17 +132,10 @@ export async function exportAndRenderSession(
     const suffix = last8(child.id);
     const childJsonPath = path.join(parentDir, `session-${suffix}.jsonl`);
     const childHtmlPath = path.join(parentDir, `session-${suffix}.html`);
-    await exportAndRenderSingleSession(
-      child.id,
-      options,
-      source,
-      childJsonPath,
-      childHtmlPath,
-      {
-        parentHtmlPath,
-        parentTitle: parentRow.title,
-      },
-    );
+    await exportAndRenderSingleSession(child.id, options, source, childJsonPath, childHtmlPath, {
+      parentHtmlPath,
+      parentTitle: parentRow.title,
+    });
   }
 }
 

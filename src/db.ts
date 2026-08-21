@@ -15,9 +15,7 @@ function isBun(): boolean {
   return typeof (globalThis as Record<string, unknown>).Bun !== "undefined";
 }
 
-function stripParamPrefix(
-  params: Record<string, unknown>,
-): Record<string, unknown> {
+function stripParamPrefix(params: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(params)) {
     result[key.replace(/^[$:@]/, "")] = value;
@@ -28,7 +26,10 @@ function stripParamPrefix(
 export async function openDatabase(path: string): Promise<Database> {
   if (isBun()) {
     const { Database } = await import("bun:sqlite");
-    const db = new Database(path, { readonly: true, create: false }) as BunDatabase;
+    const db = new Database(path, {
+      readonly: true,
+      create: false,
+    }) as BunDatabase;
     return {
       prepare: (sql) => {
         const stmt = db.query(sql) as unknown as {
@@ -37,8 +38,7 @@ export async function openDatabase(path: string): Promise<Database> {
         };
         return {
           all: (params) => (params ? stmt.all(params) : stmt.all()) as unknown[],
-          get: (params) =>
-            (params ? stmt.get(params) : stmt.get()) as unknown | undefined,
+          get: (params) => (params ? stmt.get(params) : stmt.get()) as unknown | undefined,
         };
       },
       close: () => db.close(),
@@ -46,17 +46,17 @@ export async function openDatabase(path: string): Promise<Database> {
   }
 
   const { default: Database } = await import("better-sqlite3");
-  const db = new Database(path, { readonly: true, fileMustExist: true }) as ReturnType<typeof DatabaseConstructor>;
+  const db = new Database(path, {
+    readonly: true,
+    fileMustExist: true,
+  }) as ReturnType<typeof DatabaseConstructor>;
   return {
     prepare: (sql) => {
       const stmt = db.prepare(sql);
       return {
-        all: (params) =>
-          (params ? stmt.all(stripParamPrefix(params)) : stmt.all()) as unknown[],
+        all: (params) => (params ? stmt.all(stripParamPrefix(params)) : stmt.all()) as unknown[],
         get: (params) =>
-          (params
-            ? stmt.get(stripParamPrefix(params))
-            : stmt.get()) as unknown | undefined,
+          (params ? stmt.get(stripParamPrefix(params)) : stmt.get()) as unknown | undefined,
       };
     },
     close: () => db.close(),

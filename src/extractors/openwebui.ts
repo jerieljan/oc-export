@@ -1,6 +1,6 @@
-import type { Extractor } from "./types.js";
-import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
 import { formatTimestamp } from "../format.js";
+import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
+import type { Extractor } from "./types.js";
 
 // JSON export format produced by Open WebUI.
 // The export file is a JSON array of chat objects; we process the first one.
@@ -126,10 +126,7 @@ function buildMessageChain(history: OpenWebUIHistory): OpenWebUIMessage[] {
   return chain.reverse();
 }
 
-function computeStats(
-  exportObj: OpenWebUIExport,
-  chain: OpenWebUIMessage[],
-): SessionStats {
+function computeStats(exportObj: OpenWebUIExport, chain: OpenWebUIMessage[]): SessionStats {
   const createdMs = exportObj.created_at * 1000;
   const updatedMs = exportObj.updated_at * 1000;
   const durationMs = updatedMs - createdMs;
@@ -157,10 +154,8 @@ function computeStats(
       hasTokenData = true;
       tokensInput += message.usage.input_tokens ?? 0;
       tokensOutput += message.usage.output_tokens ?? 0;
-      tokensReasoning +=
-        message.usage.output_tokens_details?.reasoning_tokens ?? 0;
-      tokensCacheRead +=
-        message.usage.input_tokens_details?.cached_tokens ?? 0;
+      tokensReasoning += message.usage.output_tokens_details?.reasoning_tokens ?? 0;
+      tokensCacheRead += message.usage.input_tokens_details?.cached_tokens ?? 0;
     }
 
     for (const item of message.output ?? []) {
@@ -214,9 +209,7 @@ function formatToolInput(argumentsJson: string | undefined): string {
   }
 }
 
-function formatToolOutput(
-  outputItems: OpenWebUIOutputContentItem[] | undefined,
-): string {
+function formatToolOutput(outputItems: OpenWebUIOutputContentItem[] | undefined): string {
   if (!outputItems || outputItems.length === 0) return "";
 
   const text = outputItems
@@ -319,9 +312,10 @@ function parseUserMessage(message: OpenWebUIMessage): Turn {
   };
 }
 
-function parseOpenWebUISession(
-  exportObj: OpenWebUIExport,
-): { meta: SessionMeta; turns: Turn[] } {
+function parseOpenWebUISession(exportObj: OpenWebUIExport): {
+  meta: SessionMeta;
+  turns: Turn[];
+} {
   const history = exportObj.chat.history;
   const chain = buildMessageChain(history);
 

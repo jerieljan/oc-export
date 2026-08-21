@@ -1,6 +1,6 @@
-import type { Extractor } from "./types.js";
-import type { Reference, SessionMeta, SessionStats, Turn } from "../types.js";
 import { formatTimestamp, parseTimestamp } from "../format.js";
+import type { Reference, SessionMeta, SessionStats, Turn } from "../types.js";
+import type { Extractor } from "./types.js";
 
 // JSON export format produced by Kagi Assistant.
 interface KagiSession {
@@ -55,7 +55,10 @@ function isKagiSession(data: unknown): data is KagiSession {
   return typeof first.role === "string" && typeof first.content === "string";
 }
 
-function extractThinking(content: string): { content: string; thinking: string[] } {
+function extractThinking(content: string): {
+  content: string;
+  thinking: string[];
+} {
   const thinking: string[] = [];
   const pattern = /<details><summary>Thinking<\/summary>([\s\S]*?)<\/details>/gi;
   const cleaned = content
@@ -96,7 +99,10 @@ function buildAssistantHeader(message: KagiMessage): string | undefined {
   return bits.length > 0 ? bits.join(" · ") : undefined;
 }
 
-function parseKagiSession(session: KagiSession): { meta: SessionMeta; turns: Turn[] } {
+function parseKagiSession(session: KagiSession): {
+  meta: SessionMeta;
+  turns: Turn[];
+} {
   const createdMs =
     parseTimestamp(session.conversation.created_at) ??
     parseTimestamp(session.messages[0]?.created_at);
@@ -104,15 +110,13 @@ function parseKagiSession(session: KagiSession): { meta: SessionMeta; turns: Tur
     parseTimestamp(session.messages[session.messages.length - 1]?.created_at) ??
     parseTimestamp(session.exported_at);
   const durationMs =
-    createdMs !== undefined && updatedMs !== undefined
-      ? updatedMs - createdMs
-      : undefined;
+    createdMs !== undefined && updatedMs !== undefined ? updatedMs - createdMs : undefined;
 
   const turns: Turn[] = [];
   let userMessages = 0;
   let assistantMessages = 0;
   let reasoningParts = 0;
-  let toolParts = 0;
+  const toolParts = 0;
   let totalCost = 0;
   let totalTokens = 0;
 

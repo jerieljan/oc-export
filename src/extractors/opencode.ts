@@ -1,6 +1,6 @@
-import type { Extractor } from "./types.js";
-import type { SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "../types.js";
 import { formatTimestamp } from "../format.js";
+import type { SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "../types.js";
+import type { Extractor } from "./types.js";
 
 // JSON export format produced by Opencode.
 interface JsonSession {
@@ -90,12 +90,9 @@ function computeStats(session: JsonSession): SessionStats {
   const createdMs = info.time?.created;
   const updatedMs = info.time?.updated;
   const durationMs =
-    createdMs !== undefined && updatedMs !== undefined
-      ? updatedMs - createdMs
-      : undefined;
+    createdMs !== undefined && updatedMs !== undefined ? updatedMs - createdMs : undefined;
 
-  let cost: number | undefined =
-    info.cost !== undefined ? info.cost : undefined;
+  let cost: number | undefined = info.cost !== undefined ? info.cost : undefined;
   if (cost === undefined) {
     const sum = session.messages.reduce((acc, message) => {
       return acc + (message.info.cost ?? 0);
@@ -138,9 +135,7 @@ function computeStats(session: JsonSession): SessionStats {
   }
 
   const totalMessages = session.messages.length;
-  const userMessages = session.messages.filter(
-    (message) => message.info.role === "user",
-  ).length;
+  const userMessages = session.messages.filter((message) => message.info.role === "user").length;
   const assistantMessages = totalMessages - userMessages;
 
   let reasoningParts = 0;
@@ -169,7 +164,10 @@ function computeStats(session: JsonSession): SessionStats {
   };
 }
 
-function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Turn[] } {
+function parseJsonSession(session: JsonSession): {
+  meta: SessionMeta;
+  turns: Turn[];
+} {
   const info = session.info;
   const meta: SessionMeta = {
     title: info.title || "Chat Session",
@@ -268,9 +266,7 @@ function collectTextParts(parts: JsonPart[], includeSynthetic = true): string {
 }
 
 function collectSyntheticParts(parts: JsonPart[]): string[] {
-  return parts
-    .filter((p) => p.type === "text" && p.text && p.synthetic)
-    .map((p) => p.text!);
+  return parts.filter((p) => p.type === "text" && p.text && p.synthetic).map((p) => p.text!);
 }
 
 function joinContent(existing: string, addition: string): string {
@@ -285,9 +281,7 @@ function buildAssistantHeader(info: JsonMessageInfo): string | undefined {
   const bits: string[] = [];
   if (info.mode) bits.push(info.mode);
   if (info.modelID) {
-    const modelLabel = info.providerID
-      ? `${info.providerID}/${info.modelID}`
-      : info.modelID;
+    const modelLabel = info.providerID ? `${info.providerID}/${info.modelID}` : info.modelID;
     bits.push(modelLabel);
   }
   if (info.time?.created && info.time?.completed) {
@@ -299,7 +293,10 @@ function buildAssistantHeader(info: JsonMessageInfo): string | undefined {
   return bits.length > 0 ? bits.join(" · ") : undefined;
 }
 
-function parseTaskState(state: JsonToolState): { stateValue?: string; sessionId?: string } {
+function parseTaskState(state: JsonToolState): {
+  stateValue?: string;
+  sessionId?: string;
+} {
   if (!state.output) return {};
   const match = state.output.match(/<task\s+id="([^"]+)"\s+state="([^"]+)"/);
   if (!match) return {};
@@ -307,9 +304,7 @@ function parseTaskState(state: JsonToolState): { stateValue?: string; sessionId?
 }
 
 function parseJsonTool(toolName: string, state: JsonToolState): ToolCall {
-  const input = state.input
-    ? JSON.stringify(state.input, null, 2)
-    : "";
+  const input = state.input ? JSON.stringify(state.input, null, 2) : "";
   let output = state.output || "";
   if (state.metadata?.truncated) {
     output = output.trimEnd();

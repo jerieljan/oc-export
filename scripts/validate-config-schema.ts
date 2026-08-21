@@ -11,9 +11,7 @@ const schemaPath = path.join(__dirname, "..", "schemas", "config-schema.json");
 const examplePath = path.join(__dirname, "..", "config-example.jsonc");
 
 const schema = JSON.parse(fs.readFileSync(schemaPath, "utf-8"));
-const example = JSON.parse(
-  stripJsonComments(fs.readFileSync(examplePath, "utf-8")),
-);
+const example = JSON.parse(stripJsonComments(fs.readFileSync(examplePath, "utf-8")));
 
 const ajv = new Ajv({ allErrors: true, strict: true });
 addFormats(ajv);

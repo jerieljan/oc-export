@@ -1,10 +1,10 @@
-import path from "node:path";
 import fs from "node:fs";
+import path from "node:path";
 import { openDatabase } from "../db.js";
 import { spawnToFile } from "../util.js";
 import type { SessionRow, Source, SourceOptions } from "./types.js";
 
-function last8(id: string): string {
+function _last8(id: string): string {
   return id.slice(-8);
 }
 
@@ -105,9 +105,7 @@ export async function findSessionById(
     }
 
     if (matches.length > 1) {
-      throw new Error(
-        `Ambiguous suffix "${idOrSuffix}" matches ${matches.length} sessions.`,
-      );
+      throw new Error(`Ambiguous suffix "${idOrSuffix}" matches ${matches.length} sessions.`);
     }
 
     throw new Error(`Session not found: ${idOrSuffix}`);
@@ -116,10 +114,7 @@ export async function findSessionById(
   }
 }
 
-export async function exportSessionToFile(
-  id: string,
-  outputPath: string,
-): Promise<string> {
+export async function exportSessionToFile(id: string, outputPath: string): Promise<string> {
   const dir = path.dirname(outputPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import path from "node:path";
-import { which } from "./src/util.js";
-import { loadConfig, DEFAULT_CONFIG_PATH, type ResolvedConfig } from "./src/config.js";
-import { renderFile, renderFiles } from "./src/render.js";
+import { DEFAULT_CONFIG_PATH, loadConfig } from "./src/config.js";
 import { pickInteractive, pickSessionById } from "./src/pick.js";
+import { renderFile, renderFiles } from "./src/render.js";
+import { which } from "./src/util.js";
 
 function showHelp(): void {
   console.log(`Usage: oc-export [options] [file.json ...]
@@ -129,9 +129,7 @@ async function main(): Promise<void> {
   const doSummarize = summarizeEnabled && (summarizeRequested || summarizeAlways);
 
   if (summarizeRequested && !summarizeEnabled) {
-    console.error(
-      "Error: --summarize requires summarize.enabled to be true in config",
-    );
+    console.error("Error: --summarize requires summarize.enabled to be true in config");
     process.exit(1);
   }
 
@@ -149,8 +147,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const doSessionSummary =
-    doSummarize && config.summarize?.sessionSummary?.enabled === true;
+  const doSessionSummary = doSummarize && config.summarize?.sessionSummary?.enabled === true;
 
   const summarizeOptions = doSummarize
     ? {

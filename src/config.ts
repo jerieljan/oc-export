@@ -3,10 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import stripJsonComments from "strip-json-comments";
 
-export const DEFAULT_CONFIG_PATH = path.join(
-  os.homedir(),
-  ".config/oc-export/config.jsonc",
-);
+export const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".config/oc-export/config.jsonc");
 
 export interface PickerConfig {
   databasePath: string;
@@ -69,10 +66,7 @@ export interface ResolvedConfig {
 }
 
 export const DEFAULT_PICKER_CONFIG: PickerConfig = {
-  databasePath: path.join(
-    os.homedir(),
-    ".local/share/opencode/opencode.db",
-  ),
+  databasePath: path.join(os.homedir(), ".local/share/opencode/opencode.db"),
   limit: 20,
 };
 
@@ -101,28 +95,19 @@ function expandHomeDir(inputPath: string): string {
   return inputPath;
 }
 
-function validateBoolean(
-  value: unknown,
-  key: string,
-): asserts value is boolean | undefined {
+function validateBoolean(value: unknown, key: string): asserts value is boolean | undefined {
   if (value !== undefined && typeof value !== "boolean") {
     throw new Error(`Config error: "${key}" must be a boolean`);
   }
 }
 
-function validateString(
-  value: unknown,
-  key: string,
-): asserts value is string | undefined {
+function validateString(value: unknown, key: string): asserts value is string | undefined {
   if (value !== undefined && typeof value !== "string") {
     throw new Error(`Config error: "${key}" must be a string`);
   }
 }
 
-function validatePositiveNumber(
-  value: unknown,
-  key: string,
-): asserts value is number | undefined {
+function validatePositiveNumber(value: unknown, key: string): asserts value is number | undefined {
   if (value !== undefined && (typeof value !== "number" || value <= 0)) {
     throw new Error(`Config error: "${key}" must be a positive number`);
   }
@@ -132,10 +117,7 @@ function validateNonNegativeInteger(
   value: unknown,
   key: string,
 ): asserts value is number | undefined {
-  if (
-    value !== undefined &&
-    (typeof value !== "number" || value < 0 || !Number.isInteger(value))
-  ) {
+  if (value !== undefined && (typeof value !== "number" || value < 0 || !Number.isInteger(value))) {
     throw new Error(`Config error: "${key}" must be a non-negative integer`);
   }
 }
@@ -178,14 +160,20 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
     validateString(config.summarize.thinkingPrompt, "summarize.thinkingPrompt");
     validateString(config.summarize.toolsPrompt, "summarize.toolsPrompt");
 
-    if (config.summarize.sessionSummary !== undefined && typeof config.summarize.sessionSummary !== "object") {
+    if (
+      config.summarize.sessionSummary !== undefined &&
+      typeof config.summarize.sessionSummary !== "object"
+    ) {
       throw new Error('Config error: "summarize.sessionSummary" must be an object');
     }
 
     if (config.summarize.sessionSummary) {
       validateBoolean(config.summarize.sessionSummary.enabled, "summarize.sessionSummary.enabled");
       validateString(config.summarize.sessionSummary.prompt, "summarize.sessionSummary.prompt");
-      validateBoolean(config.summarize.sessionSummary.collapsed, "summarize.sessionSummary.collapsed");
+      validateBoolean(
+        config.summarize.sessionSummary.collapsed,
+        "summarize.sessionSummary.collapsed",
+      );
     }
   }
 
@@ -229,33 +217,39 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
   };
 }
 
+// Returns a fresh copy of the defaults so callers can mutate the resolved
+// config (e.g. overriding the extractor from a CLI flag) without affecting
+// the shared DEFAULT_CONFIG object.
+function freshDefaultConfig(): ResolvedConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    picker: { ...DEFAULT_CONFIG.picker },
+    claude: { ...DEFAULT_CONFIG.claude },
+    pi: { ...DEFAULT_CONFIG.pi },
+  };
+}
+
 export function loadConfig(configPath: string = DEFAULT_CONFIG_PATH): ResolvedConfig {
   if (!fs.existsSync(configPath)) {
-    return DEFAULT_CONFIG;
+    return freshDefaultConfig();
   }
 
   let text: string;
   try {
     text = fs.readFileSync(configPath, "utf-8");
   } catch (err) {
-    throw new Error(
-      `Failed to read config file ${configPath}: ${(err as Error).message}`,
-    );
+    throw new Error(`Failed to read config file ${configPath}: ${(err as Error).message}`);
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(stripJsonComments(text));
   } catch (err) {
-    throw new Error(
-      `Failed to parse config file ${configPath}: ${(err as Error).message}`,
-    );
+    throw new Error(`Failed to parse config file ${configPath}: ${(err as Error).message}`);
   }
 
   if (parsed !== null && typeof parsed !== "object") {
-    throw new Error(
-      `Config error: ${configPath} must contain a JSON object`,
-    );
+    throw new Error(`Config error: ${configPath} must contain a JSON object`);
   }
 
   return validateUserConfig(parsed as UserConfig);

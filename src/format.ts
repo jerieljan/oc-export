@@ -1,17 +1,13 @@
 // Shared formatting helpers used by extractors and the renderer.
 
-export function parseTimestamp(
-  value: string | number | undefined,
-): number | undefined {
+export function parseTimestamp(value: string | number | undefined): number | undefined {
   if (value === undefined) return undefined;
   if (typeof value === "number") return value;
   const parsed = Date.parse(value);
-  return isNaN(parsed) ? undefined : parsed;
+  return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-export function formatTimestamp(
-  value: string | number | undefined,
-): string | undefined {
+export function formatTimestamp(value: string | number | undefined): string | undefined {
   const ms = parseTimestamp(value);
   if (ms === undefined) return undefined;
   return new Date(ms).toLocaleString();

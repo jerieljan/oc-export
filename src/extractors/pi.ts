@@ -1,12 +1,6 @@
-import type { Extractor } from "./types.js";
-import type {
-  ExtensionState,
-  SessionMeta,
-  SessionStats,
-  ToolCall,
-  Turn,
-} from "../types.js";
 import { formatTimestamp } from "../format.js";
+import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
+import type { Extractor } from "./types.js";
 
 // Content blocks shared by Pi messages.
 interface TextContent {
@@ -33,11 +27,7 @@ interface ToolCallContent {
   arguments: Record<string, unknown>;
 }
 
-type ContentBlock =
-  | TextContent
-  | ImageContent
-  | ThinkingContent
-  | ToolCallContent;
+type ContentBlock = TextContent | ImageContent | ThinkingContent | ToolCallContent;
 
 interface Usage {
   input: number;
@@ -247,9 +237,7 @@ function extractText(content: string | ContentBlock[]): string {
 }
 
 function extractImageNote(content: ContentBlock[]): string {
-  const images = content.filter(
-    (block): block is ImageContent => block.type === "image",
-  );
+  const images = content.filter((block): block is ImageContent => block.type === "image");
   if (images.length === 0) return "";
   return `\n\n[${images.length} image(s) omitted]`;
 }
@@ -285,20 +273,13 @@ function buildAssistantHeader(
   const effectiveModel = message.model || model;
   const effectiveProvider = message.provider || provider;
   if (effectiveModel) {
-    bits.push(
-      effectiveProvider
-        ? `${effectiveProvider}/${effectiveModel}`
-        : effectiveModel,
-    );
+    bits.push(effectiveProvider ? `${effectiveProvider}/${effectiveModel}` : effectiveModel);
   }
   if (thinkingLevel) bits.push(`thinking: ${thinkingLevel}`);
   return bits.length > 0 ? bits.join(" · ") : undefined;
 }
 
-function retainedMessageToEntry(
-  message: AgentMessage,
-  timestamp: string,
-): PiMessageEntry {
+function retainedMessageToEntry(message: AgentMessage, timestamp: string): PiMessageEntry {
   return {
     type: "message",
     id: `retained-${Math.random().toString(36).slice(2, 10)}`,
@@ -314,7 +295,7 @@ function applyCompactions(path: TreeEntry[]): PiEntry[] {
 
   for (let i = 0; i < path.length; i++) {
     const entry = path[i];
-    if (!entry || entry.type !== "compaction") continue;
+    if (entry?.type !== "compaction") continue;
 
     if (entry.retainedTail && entry.retainedTail.length > 0) {
       cutIndex = i;
@@ -333,9 +314,7 @@ function applyCompactions(path: TreeEntry[]): PiEntry[] {
   if (retainedTail && retainedTail.length > 0) {
     const compactionIdx = result.findIndex(
       (e): e is PiCompactionEntry =>
-        e.type === "compaction" &&
-        Array.isArray(e.retainedTail) &&
-        e.retainedTail.length > 0,
+        e.type === "compaction" && Array.isArray(e.retainedTail) && e.retainedTail.length > 0,
     );
     if (compactionIdx !== -1) {
       const retainedEntries = retainedTail.map((message) =>
@@ -391,17 +370,16 @@ function buildMainBranch(entries: PiEntry[]): PiEntry[] {
   return applyCompactions(path);
 }
 
-function addExtensionToTurn(
-  turn: Turn | undefined,
-  customType: string,
-  data: string,
-): void {
+function addExtensionToTurn(turn: Turn | undefined, customType: string, data: string): void {
   if (!turn) return;
   if (!turn.extensions) turn.extensions = [];
   turn.extensions.push({ customType, data });
 }
 
-function parseJsonlSession(data: PiEntry[]): { meta: SessionMeta; turns: Turn[] } {
+function parseJsonlSession(data: PiEntry[]): {
+  meta: SessionMeta;
+  turns: Turn[];
+} {
   const header = data.find((e): e is PiSessionHeader => e.type === "session");
   const branch = buildMainBranch(data);
 
@@ -472,9 +450,7 @@ function parseJsonlSession(data: PiEntry[]): { meta: SessionMeta; turns: Turn[] 
         "",
         [],
         [tool],
-        currentModel
-          ? `${currentProvider ?? ""}/${currentModel}`.replace(/^\//, "")
-          : undefined,
+        currentModel ? `${currentProvider ?? ""}/${currentModel}`.replace(/^\//, "") : undefined,
       );
     }
     toolParts++;
@@ -517,12 +493,7 @@ function parseJsonlSession(data: PiEntry[]): { meta: SessionMeta; turns: Turn[] 
             textContent,
             thinking,
             tools,
-            buildAssistantHeader(
-              message,
-              currentProvider,
-              currentModel,
-              currentThinkingLevel,
-            ),
+            buildAssistantHeader(message, currentProvider, currentModel, currentThinkingLevel),
           );
           recordUsage(message.usage);
           currentProvider = message.provider;
@@ -536,9 +507,7 @@ function parseJsonlSession(data: PiEntry[]): { meta: SessionMeta; turns: Turn[] 
           const output = collectToolResultOutput(message);
           const pending = pendingToolCalls.get(message.toolCallId);
           if (pending) {
-            pending.output = message.isError
-              ? `[error]\n\n${output}`
-              : output;
+            pending.output = message.isError ? `[error]\n\n${output}` : output;
             pendingToolCalls.delete(message.toolCallId);
           } else {
             const tool: ToolCall = {
@@ -556,10 +525,7 @@ function parseJsonlSession(data: PiEntry[]): { meta: SessionMeta; turns: Turn[] 
           const outputParts: string[] = [];
           if (message.cancelled) outputParts.push("[cancelled]");
           if (message.truncated) outputParts.push("[truncated]");
-          if (
-            message.exitCode !== undefined &&
-            message.exitCode !== 0
-          ) {
+          if (message.exitCode !== undefined && message.exitCode !== 0) {
             outputParts.push(`[exit code ${message.exitCode}]`);
           }
           outputParts.push(message.output);
@@ -575,9 +541,7 @@ function parseJsonlSession(data: PiEntry[]): { meta: SessionMeta; turns: Turn[] 
 
         if (message.role === "custom") {
           const data =
-            typeof message.content === "string"
-              ? message.content
-              : extractText(message.content);
+            typeof message.content === "string" ? message.content : extractText(message.content);
           addExtensionToTurn(lastTurn, message.customType, data);
           break;
         }
@@ -630,9 +594,7 @@ function parseJsonlSession(data: PiEntry[]): { meta: SessionMeta; turns: Turn[] 
           `**Compaction summary:** ${entry.summary}\n\nTokens before compaction: ${entry.tokensBefore.toLocaleString()}.`,
           [],
           [],
-          currentModel
-            ? `${currentProvider ?? ""}/${currentModel}`.replace(/^\//, "")
-            : undefined,
+          currentModel ? `${currentProvider ?? ""}/${currentModel}`.replace(/^\//, "") : undefined,
         );
         recordUsage(entry.usage);
         break;
@@ -643,28 +605,19 @@ function parseJsonlSession(data: PiEntry[]): { meta: SessionMeta; turns: Turn[] 
           `**Branch summary:** ${entry.summary}`,
           [],
           [],
-          currentModel
-            ? `${currentProvider ?? ""}/${currentModel}`.replace(/^\//, "")
-            : undefined,
+          currentModel ? `${currentProvider ?? ""}/${currentModel}`.replace(/^\//, "") : undefined,
         );
         recordUsage(entry.usage);
         break;
       }
 
       case "custom": {
-        addExtensionToTurn(
-          lastTurn,
-          entry.customType,
-          JSON.stringify(entry.data, null, 2),
-        );
+        addExtensionToTurn(lastTurn, entry.customType, JSON.stringify(entry.data, null, 2));
         break;
       }
 
       case "custom_message": {
-        const data =
-          typeof entry.content === "string"
-            ? entry.content
-            : extractText(entry.content);
+        const data = typeof entry.content === "string" ? entry.content : extractText(entry.content);
         addExtensionToTurn(lastTurn, entry.customType, data);
         break;
       }
@@ -679,11 +632,11 @@ function parseJsonlSession(data: PiEntry[]): { meta: SessionMeta; turns: Turn[] 
   const timestamps: number[] = [];
   if (header) {
     const ms = parseTimestamp(header.timestamp);
-    if (!isNaN(ms)) timestamps.push(ms);
+    if (!Number.isNaN(ms)) timestamps.push(ms);
   }
   for (const entry of branch) {
     const ms = parseTimestamp(entry.timestamp);
-    if (!isNaN(ms)) timestamps.push(ms);
+    if (!Number.isNaN(ms)) timestamps.push(ms);
   }
   const createdMs = timestamps.length > 0 ? Math.min(...timestamps) : undefined;
   const updatedMs = timestamps.length > 0 ? Math.max(...timestamps) : undefined;
@@ -706,9 +659,7 @@ function parseJsonlSession(data: PiEntry[]): { meta: SessionMeta; turns: Turn[] 
     createdMs,
     updatedMs,
     durationMs:
-      createdMs !== undefined && updatedMs !== undefined
-        ? updatedMs - createdMs
-        : undefined,
+      createdMs !== undefined && updatedMs !== undefined ? updatedMs - createdMs : undefined,
     cost: hasUsage && totalCost > 0 ? totalCost : undefined,
     tokensInput: hasUsage ? tokensInput : undefined,
     tokensOutput: hasUsage ? tokensOutput : undefined,

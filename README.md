@@ -70,6 +70,17 @@ npx oc-export --help
 - `bun install` to set up dependencies.
 - Use `bun run oc-export` to run locally. Use `bun link` so you can invoke oc-export anywhere.
 
+Development commands:
+
+```bash
+bun run typecheck        # TypeScript check across source and build config
+bun run lint             # Biome lint + format check
+bun run lint:fix         # Biome lint + format with auto-fixes applied
+bun run test:config-schema
+```
+
+CI runs these checks on every push to `master` and pull request.
+
 While running oc-export:
 
 - If you have OpenCode present, it will show you your recent sessions and export both the JSON and HTML result.

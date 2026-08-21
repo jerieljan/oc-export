@@ -1,11 +1,11 @@
 import type { SessionMeta, Turn } from "../types.js";
-import type { Extractor } from "./types.js";
-import { kagiExtractor } from "./kagi.js";
 import { claudeExtractor } from "./claude.js";
+import { kagiExtractor } from "./kagi.js";
 import { opencodeExtractor } from "./opencode.js";
 import { opencode2Extractor } from "./opencode2.js";
 import { openWebUIExtractor } from "./openwebui.js";
 import { piExtractor } from "./pi.js";
+import type { Extractor } from "./types.js";
 
 const extractors: Extractor[] = [
   openWebUIExtractor,
@@ -28,7 +28,10 @@ export function getExtractors(): readonly Extractor[] {
 
 // Attempt to extract a canonical session from raw parsed JSON. Each registered
 // extractor is tried in order until one reports it can handle the data.
-export function extractSession(data: unknown): { meta: SessionMeta; turns: Turn[] } {
+export function extractSession(data: unknown): {
+  meta: SessionMeta;
+  turns: Turn[];
+} {
   for (const extractor of extractors) {
     if (extractor.canExtract(data)) {
       return extractor.extract(data);
@@ -38,6 +41,6 @@ export function extractSession(data: unknown): { meta: SessionMeta; turns: Turn[
   throw new Error(
     "No registered extractor can handle this JSON format. " +
       "Supported formats: " +
-      extractors.map((e) => e.label).join(", ") || "none",
+      (extractors.map((e) => e.label).join(", ") || "none"),
   );
 }

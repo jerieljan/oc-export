@@ -1,5 +1,5 @@
-import { spawnWithStdin, which } from "./util.js";
 import type { ToolCall, Turn } from "./types.js";
+import { spawnWithStdin, which } from "./util.js";
 
 export interface SummarizeOptions {
   model: string;
@@ -91,11 +91,7 @@ function serializeTools(tools: ToolCall[]): string {
     .join("\n\n---\n\n");
 }
 
-async function callLlm(
-  model: string,
-  systemPrompt: string,
-  content: string,
-): Promise<string> {
+async function callLlm(model: string, systemPrompt: string, content: string): Promise<string> {
   if (!which("llm")) {
     throw new Error(
       "The `llm` CLI is not installed or not on PATH. " +
@@ -121,18 +117,11 @@ async function callLlm(
   return result;
 }
 
-export async function summarizeTurns(
-  turns: Turn[],
-  options: SummarizeOptions,
-): Promise<void> {
+export async function summarizeTurns(turns: Turn[], options: SummarizeOptions): Promise<void> {
   const thinkingPrompt =
-    options.thinkingPrompt?.trim() ??
-    options.prompt?.trim() ??
-    DEFAULT_THINKING_SUMMARY_PROMPT;
+    options.thinkingPrompt?.trim() ?? options.prompt?.trim() ?? DEFAULT_THINKING_SUMMARY_PROMPT;
   const toolsPrompt =
-    options.toolsPrompt?.trim() ??
-    options.prompt?.trim() ??
-    DEFAULT_TOOLS_SUMMARY_PROMPT;
+    options.toolsPrompt?.trim() ?? options.prompt?.trim() ?? DEFAULT_TOOLS_SUMMARY_PROMPT;
   const tasks: Promise<void>[] = [];
 
   for (const turn of turns) {
@@ -142,11 +131,7 @@ export async function summarizeTurns(
       tasks.push(
         (async () => {
           const content = serializeThinking(turn.thinking);
-          turn.thinkingSummary = await callLlm(
-            options.model,
-            thinkingPrompt,
-            content,
-          );
+          turn.thinkingSummary = await callLlm(options.model, thinkingPrompt, content);
         })(),
       );
     }
@@ -155,11 +140,7 @@ export async function summarizeTurns(
       tasks.push(
         (async () => {
           const content = serializeTools(turn.tools);
-          turn.toolsSummary = await callLlm(
-            options.model,
-            toolsPrompt,
-            content,
-          );
+          turn.toolsSummary = await callLlm(options.model, toolsPrompt, content);
         })(),
       );
     }
@@ -179,12 +160,15 @@ function serializeSession(turns: Turn[]): string {
       }
 
       if (turn.role === "assistant") {
-        const thinking = turn.thinkingSummary || (turn.thinking.length > 0 ? turn.thinking.join("\n\n") : undefined);
+        const thinking =
+          turn.thinkingSummary ||
+          (turn.thinking.length > 0 ? turn.thinking.join("\n\n") : undefined);
         if (thinking) {
           parts.push(`Thinking summary:\n${thinking}`);
         }
 
-        const tools = turn.toolsSummary || (turn.tools.length > 0 ? serializeTools(turn.tools) : undefined);
+        const tools =
+          turn.toolsSummary || (turn.tools.length > 0 ? serializeTools(turn.tools) : undefined);
         if (tools) {
           parts.push(`Tool calls summary:\n${tools}`);
         }
@@ -195,10 +179,7 @@ function serializeSession(turns: Turn[]): string {
     .join("\n\n---\n\n");
 }
 
-export async function summarizeSession(
-  turns: Turn[],
-  options: SummarizeOptions,
-): Promise<string> {
+export async function summarizeSession(turns: Turn[], options: SummarizeOptions): Promise<string> {
   const prompt = options.sessionSummaryPrompt?.trim() ?? DEFAULT_SESSION_SUMMARY_PROMPT;
   const content = serializeSession(turns);
   return await callLlm(options.model, prompt, content);

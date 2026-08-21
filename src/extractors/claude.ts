@@ -1,6 +1,6 @@
-import type { Extractor } from "./types.js";
-import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
 import { formatTimestamp } from "../format.js";
+import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
+import type { Extractor } from "./types.js";
 
 // Claude Code JSONL message format.
 // The source layer normalizes the raw JSONL (inlines subagents, resolves
@@ -69,9 +69,7 @@ function isClaudeMessageArray(data: unknown): data is ClaudeMessage[] {
   if (!Array.isArray(data) || data.length === 0) return false;
   const first = data[0];
   if (typeof first !== "object" || first === null) return false;
-  return (
-    "type" in first || "sessionId" in first || "uuid" in first || "message" in first
-  );
+  return "type" in first || "sessionId" in first || "uuid" in first || "message" in first;
 }
 
 function isNormalizedClaudeExport(data: unknown): data is NormalizedExport {
@@ -92,7 +90,7 @@ function getMessages(data: unknown): ClaudeMessage[] {
 function parseTimestamp(value: string | undefined): number | undefined {
   if (!value) return undefined;
   const ms = Date.parse(value);
-  return isNaN(ms) ? undefined : ms;
+  return Number.isNaN(ms) ? undefined : ms;
 }
 
 const NON_CONVERSATION_TYPES = new Set([
@@ -121,11 +119,7 @@ function collectMainBranch(messages: ClaudeMessage[]): ClaudeMessage[] {
   let latestMs = -Infinity;
 
   for (const message of messages) {
-    if (
-      message.uuid &&
-      message.type &&
-      !NON_CONVERSATION_TYPES.has(message.type)
-    ) {
+    if (message.uuid && message.type && !NON_CONVERSATION_TYPES.has(message.type)) {
       const ms = parseTimestamp(message.timestamp) ?? 0;
       if (ms > latestMs) {
         latestMs = ms;
@@ -148,11 +142,7 @@ function collectMainBranch(messages: ClaudeMessage[]): ClaudeMessage[] {
   if (!leaf) {
     for (let i = messages.length - 1; i >= 0; i--) {
       const message = messages[i]!;
-      if (
-        message.uuid &&
-        message.type &&
-        !NON_CONVERSATION_TYPES.has(message.type)
-      ) {
+      if (message.uuid && message.type && !NON_CONVERSATION_TYPES.has(message.type)) {
         leaf = message;
         break;
       }
@@ -165,10 +155,10 @@ function collectMainBranch(messages: ClaudeMessage[]): ClaudeMessage[] {
   let current: ClaudeMessage | null = leaf;
   const seen = new Set<string>();
 
-  while (current && current.uuid && !seen.has(current.uuid)) {
+  while (current?.uuid && !seen.has(current.uuid)) {
     seen.add(current.uuid);
     chain.push(current);
-    current = current.parentUuid ? byUuid.get(current.parentUuid) ?? null : null;
+    current = current.parentUuid ? (byUuid.get(current.parentUuid) ?? null) : null;
   }
 
   chain.reverse();
@@ -205,7 +195,7 @@ function renderAttachment(message: ClaudeMessage): string {
   if (attachment.type === "file" && attachment.content && typeof attachment.content === "object") {
     const file = (attachment.content as Record<string, unknown>).file;
     if (file && typeof file === "object") {
-      body = (file as Record<string, unknown>).content as string || "";
+      body = ((file as Record<string, unknown>).content as string) || "";
     }
   } else if (attachment.type === "skill_listing") {
     body = typeof attachment.content === "string" ? attachment.content : "";
@@ -216,9 +206,10 @@ function renderAttachment(message: ClaudeMessage): string {
         ? attachment.content
         : "";
   } else {
-    body = typeof attachment.content === "string"
-      ? attachment.content
-      : JSON.stringify(attachment.content, null, 2);
+    body =
+      typeof attachment.content === "string"
+        ? attachment.content
+        : JSON.stringify(attachment.content, null, 2);
   }
 
   if (!body) return "";
@@ -254,6 +245,7 @@ function getFullTagRegex(tagName: string): RegExp {
 }
 
 function stripAnsiCodes(text: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally matches ANSI color escape codes
   return text.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
@@ -346,9 +338,7 @@ function stringifyContent(content: unknown): string {
     return content
       .map((item) => {
         if (typeof item === "object" && item !== null && "text" in item) {
-          return unescapeClaudeString(
-            String((item as Record<string, unknown>).text || ""),
-          );
+          return unescapeClaudeString(String((item as Record<string, unknown>).text || ""));
         }
         return JSON.stringify(item, null, 2);
       })
@@ -398,10 +388,7 @@ function extractToolCalls(
 
   if (Array.isArray(userBlocks)) {
     for (const block of userBlocks as ContentBlock[]) {
-      if (
-        block.type === "tool_result" &&
-        typeof block.tool_use_id === "string"
-      ) {
+      if (block.type === "tool_result" && typeof block.tool_use_id === "string") {
         results[block.tool_use_id] = block;
       }
     }
@@ -459,9 +446,7 @@ function computeStats(
     createdMs,
     updatedMs,
     durationMs:
-      createdMs !== undefined && updatedMs !== undefined
-        ? updatedMs - createdMs
-        : undefined,
+      createdMs !== undefined && updatedMs !== undefined ? updatedMs - createdMs : undefined,
     tokensInput: usage.input_tokens,
     tokensOutput: usage.output_tokens,
     tokensReasoning: undefined,
@@ -474,7 +459,10 @@ function computeStats(
   };
 }
 
-function parseJsonlSession(data: unknown): { meta: SessionMeta; turns: Turn[] } {
+function parseJsonlSession(data: unknown): {
+  meta: SessionMeta;
+  turns: Turn[];
+} {
   const messages = getMessages(data);
   const mainBranch = collectMainBranch(messages);
   const attachmentContext = collectAttachmentContext(messages);
@@ -506,10 +494,8 @@ function parseJsonlSession(data: unknown): { meta: SessionMeta; turns: Turn[] } 
   if (!title) {
     for (const message of mainBranch) {
       if (message.type === "user" && typeof message.message?.content === "string") {
-        const prompt = unescapeClaudeString(message.message.content)
-          .replace(/\s+/g, " ")
-          .trim();
-        title = prompt.length > 80 ? prompt.slice(0, 77) + "..." : prompt;
+        const prompt = unescapeClaudeString(message.message.content).replace(/\s+/g, " ").trim();
+        title = prompt.length > 80 ? `${prompt.slice(0, 77)}...` : prompt;
         break;
       }
     }
@@ -537,7 +523,9 @@ function parseJsonlSession(data: unknown): { meta: SessionMeta; turns: Turn[] } 
       durations.set(message.promptId, message.durationMs ?? 0);
     }
     if (message.type === "assistant") {
-      const u = (message.message as Record<string, unknown> | undefined)?.usage as ClaudeUsage | undefined;
+      const u = (message.message as Record<string, unknown> | undefined)?.usage as
+        | ClaudeUsage
+        | undefined;
       if (!u) continue;
       if (u.input_tokens) usage.input_tokens! += u.input_tokens;
       if (u.output_tokens) usage.output_tokens! += u.output_tokens;
@@ -567,9 +555,7 @@ function parseJsonlSession(data: unknown): { meta: SessionMeta; turns: Turn[] } 
       const content = extractUserText(rawContent);
       const synthetic = attachmentContext.get(message.uuid || "") ?? [];
 
-      const meta = typeof content === "string"
-        ? classifyMetaTagMessage(content)
-        : null;
+      const meta = typeof content === "string" ? classifyMetaTagMessage(content) : null;
       if (meta?.type === "drop") {
         continue;
       }
@@ -579,9 +565,8 @@ function parseJsonlSession(data: unknown): { meta: SessionMeta; turns: Turn[] } 
         const nextMessage = mainBranch[i + 1];
         if (nextMessage?.type === "user") {
           const nextContent = extractUserText(nextMessage.message?.content);
-          const nextMeta = typeof nextContent === "string"
-            ? classifyMetaTagMessage(nextContent)
-            : null;
+          const nextMeta =
+            typeof nextContent === "string" ? classifyMetaTagMessage(nextContent) : null;
           if (nextMeta?.type === "output") {
             i++;
             finalContent = formatCommandOutput(meta.content, nextMeta.content);
@@ -644,9 +629,7 @@ function parseJsonlSession(data: unknown): { meta: SessionMeta; turns: Turn[] } 
           }
         } else if (block.type === "text") {
           if (block.text) {
-            textContent = textContent
-              ? `${textContent}\n\n${block.text}`
-              : block.text;
+            textContent = textContent ? `${textContent}\n\n${block.text}` : block.text;
           }
         } else if (block.type === "tool_use") {
           toolUseBlocks.push(block);
@@ -657,9 +640,7 @@ function parseJsonlSession(data: unknown): { meta: SessionMeta; turns: Turn[] } 
       const nextUserMessage = mainBranch[i + 1] ?? null;
       const tools = extractToolCalls(toolUseBlocks, nextUserMessage);
 
-      const turnDuration = message.promptId
-        ? durations.get(message.promptId)
-        : undefined;
+      const turnDuration = message.promptId ? durations.get(message.promptId) : undefined;
 
       turns.push({
         role: "assistant",

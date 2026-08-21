@@ -1,6 +1,6 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
 
 function isExecutable(filePath: string): boolean {
   try {
@@ -32,14 +32,9 @@ export function which(command: string): string | null {
   return null;
 }
 
-export function spawnToFile(
-  command: string[],
-  outputPath: string,
-): Promise<string> {
+export function spawnToFile(command: string[], outputPath: string): Promise<string> {
   if (command.length === 0) {
-    return Promise.reject(
-      new Error("spawnToFile requires a non-empty command"),
-    );
+    return Promise.reject(new Error("spawnToFile requires a non-empty command"));
   }
 
   return new Promise((resolve, reject) => {
@@ -60,7 +55,7 @@ export function spawnToFile(
     });
 
     let stderr = "";
-    proc.stderr!.on("data", (data: Buffer) => {
+    proc.stderr?.on("data", (data: Buffer) => {
       stderr += data.toString("utf-8");
     });
 
@@ -80,11 +75,7 @@ export function spawnToFile(
     proc.on("close", (code: number | null) => {
       cleanupFd();
       if (code !== 0) {
-        reject(
-          new Error(
-            `${command[0]} failed (exit ${code}):\n${stderr || "no output"}`,
-          ),
-        );
+        reject(new Error(`${command[0]} failed (exit ${code}):\n${stderr || "no output"}`));
       } else {
         resolve(outputPath);
       }
@@ -98,14 +89,9 @@ export interface SpawnResult {
   exitCode: number;
 }
 
-export function spawnWithStdin(
-  command: string[],
-  stdin: Buffer,
-): Promise<SpawnResult> {
+export function spawnWithStdin(command: string[], stdin: Buffer): Promise<SpawnResult> {
   if (command.length === 0) {
-    return Promise.reject(
-      new Error("spawnWithStdin requires a non-empty command"),
-    );
+    return Promise.reject(new Error("spawnWithStdin requires a non-empty command"));
   }
 
   return new Promise((resolve, reject) => {

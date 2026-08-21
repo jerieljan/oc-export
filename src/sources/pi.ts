@@ -1,6 +1,6 @@
-import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import type { SessionRow, Source, SourceOptions } from "./types.js";
 
 const DEFAULT_SESSIONS_PATH = path.join(os.homedir(), ".pi/agent/sessions");
@@ -35,17 +35,12 @@ function truncate(text: string, max: number): string {
 
 function normalizeDirectoryName(dirName: string): string {
   // Pi directories are encoded as --<cwd-with-dashes>--
-  return dirName
-    .replace(/^--/, "")
-    .replace(/--$/, "")
-    .replace(/-/g, "/");
+  return dirName.replace(/^--/, "").replace(/--$/, "").replace(/-/g, "/");
 }
 
 function extractUuidFromFileName(fileName: string): string | undefined {
   const base = path.basename(fileName, ".jsonl");
-  const match = base.match(
-    /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
-  );
+  const match = base.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
   return match?.[1];
 }
 
@@ -166,10 +161,7 @@ export function listSessions(options: SourceOptions): SessionRow[] {
   return files.slice(0, limit).map(mapToRow);
 }
 
-export function findSessionById(
-  idOrSuffix: string,
-  options: SourceOptions,
-): SessionRow {
+export function findSessionById(idOrSuffix: string, options: SourceOptions): SessionRow {
   const sessionsPath = getSessionsPath(options);
 
   if (!fs.existsSync(sessionsPath)) {
@@ -184,9 +176,7 @@ export function findSessionById(
   if (matches.length === 1) return mapToRow(matches[0]!);
 
   if (matches.length > 1) {
-    throw new Error(
-      `Ambiguous suffix "${idOrSuffix}" matches ${matches.length} Pi sessions.`,
-    );
+    throw new Error(`Ambiguous suffix "${idOrSuffix}" matches ${matches.length} Pi sessions.`);
   }
 
   throw new Error(`Pi session not found: ${idOrSuffix}`);

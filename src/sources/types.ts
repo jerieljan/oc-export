@@ -26,10 +26,7 @@ export interface Source {
   listSessions(options: SourceOptions): Promise<SessionRow[]> | SessionRow[];
 
   // Find a session by full ID or a unique last-N suffix.
-  findSessionById(
-    idOrSuffix: string,
-    options: SourceOptions,
-  ): Promise<SessionRow> | SessionRow;
+  findSessionById(idOrSuffix: string, options: SourceOptions): Promise<SessionRow> | SessionRow;
 
   // Find sessions that were spawned as subagents of a parent session.
   // Optional; sources that do not store parent/child relationships may omit it.
@@ -40,9 +37,5 @@ export interface Source {
 
   // Export a session to a file on disk and return the written path.
   // The caller is responsible for rendering the exported file.
-  exportSessionToFile(
-    id: string,
-    outputPath: string,
-    options: SourceOptions,
-  ): Promise<string>;
+  exportSessionToFile(id: string, outputPath: string, options: SourceOptions): Promise<string>;
 }

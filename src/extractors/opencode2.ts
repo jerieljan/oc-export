@@ -1,6 +1,6 @@
-import type { Extractor } from "./types.js";
-import type { SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "../types.js";
 import { formatTimestamp } from "../format.js";
+import type { SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "../types.js";
+import type { Extractor } from "./types.js";
 
 // JSON export format produced by opencode2 (OpenCode V2).
 interface JsonSession {
@@ -108,12 +108,9 @@ function computeStats(session: JsonSession): SessionStats {
   const createdMs = info.time?.created;
   const updatedMs = info.time?.updated;
   const durationMs =
-    createdMs !== undefined && updatedMs !== undefined
-      ? updatedMs - createdMs
-      : undefined;
+    createdMs !== undefined && updatedMs !== undefined ? updatedMs - createdMs : undefined;
 
-  let cost: number | undefined =
-    info.cost !== undefined ? info.cost : undefined;
+  let cost: number | undefined = info.cost !== undefined ? info.cost : undefined;
   if (cost === undefined) {
     const sum = session.messages.reduce((acc, message) => {
       return acc + (message.cost ?? 0);
@@ -156,9 +153,7 @@ function computeStats(session: JsonSession): SessionStats {
   }
 
   const totalMessages = session.messages.length;
-  const userMessages = session.messages.filter(
-    (message) => message.type === "user",
-  ).length;
+  const userMessages = session.messages.filter((message) => message.type === "user").length;
   const assistantMessages = totalMessages - userMessages;
 
   let reasoningParts = 0;
@@ -206,16 +201,17 @@ function collectToolOutput(state: JsonToolState): string {
   return state.output || "";
 }
 
-function parseTaskState(output: string): { stateValue?: string; sessionId?: string } {
+function parseTaskState(output: string): {
+  stateValue?: string;
+  sessionId?: string;
+} {
   const match = output.match(/<task\s+id="([^"]+)"\s+state="([^"]+)"/);
   if (!match) return {};
   return { sessionId: match[1], stateValue: match[2] };
 }
 
 function parseJsonTool(toolName: string, state: JsonToolState): ToolCall {
-  const input = state.input
-    ? JSON.stringify(state.input, null, 2)
-    : "";
+  const input = state.input ? JSON.stringify(state.input, null, 2) : "";
   let output = collectToolOutput(state);
   if (state.metadata?.truncated) {
     output = output.trimEnd();
@@ -321,7 +317,10 @@ function appendMessageToTurn(
   }
 }
 
-function parseJsonSession(session: JsonSession): { meta: SessionMeta; turns: Turn[] } {
+function parseJsonSession(session: JsonSession): {
+  meta: SessionMeta;
+  turns: Turn[];
+} {
   const info = session.info;
   const meta: SessionMeta = {
     title: info.title || "Chat Session",
