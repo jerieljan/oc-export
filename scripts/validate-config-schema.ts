@@ -38,7 +38,7 @@ if (!validate(example)) {
 const invalidCases = [
   { raw: "not a boolean" },
   { extractor: "unknown" },
-  { summarize: { model: "gpt-4o-mini" } },
+  { summarize: { enabled: true } },
   { navigation: { minTurns: -1 } },
 ];
 

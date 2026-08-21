@@ -1,4 +1,5 @@
 import { formatTimestamp } from "../format.js";
+import { joinContent } from "../text.js";
 import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
 import type { Extractor } from "./types.js";
 
@@ -232,14 +233,6 @@ function extractMessageText(content: OpenWebUIContentItem[]): string {
     .filter((item) => item.type === "output_text" && typeof item.text === "string")
     .map((item) => item.text!)
     .join("\n\n");
-}
-
-function joinContent(existing: string, addition: string): string {
-  existing = existing.trim();
-  addition = addition.trim();
-  if (!existing) return addition;
-  if (!addition) return existing;
-  return `${existing}\n\n${addition}`;
 }
 
 function buildAssistantHeader(message: OpenWebUIMessage): string | undefined {

@@ -94,8 +94,14 @@ function serializeTools(tools: ToolCall[]): string {
     .join("\n\n---\n\n");
 }
 
+// Memoized so a long session doesn't rescan PATH once per summarized block.
+let llmOnPath: boolean | null = null;
+
 async function callLlm(model: string, systemPrompt: string, content: string): Promise<string> {
-  if (!which("llm")) {
+  if (llmOnPath === null) {
+    llmOnPath = which("llm") !== null;
+  }
+  if (!llmOnPath) {
     throw new Error(
       "The `llm` CLI is not installed or not on PATH. " +
         "Install it (https://llm.datasette.io/) or omit --summarize.",

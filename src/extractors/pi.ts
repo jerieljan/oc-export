@@ -1,4 +1,5 @@
-import { formatTimestamp } from "../format.js";
+import { formatTimestamp, parseTimestamp } from "../format.js";
+import { joinContent } from "../text.js";
 import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
 import type { Extractor } from "./types.js";
 
@@ -224,10 +225,6 @@ function isPiSessionData(data: unknown): data is PiEntry[] {
   );
 }
 
-function parseTimestamp(value: string): number {
-  return Date.parse(value);
-}
-
 function extractText(content: string | ContentBlock[]): string {
   if (typeof content === "string") return content;
   return content
@@ -253,14 +250,6 @@ function collectUserContent(message: UserMessage): string {
 function collectToolResultOutput(message: ToolResultMessage): string {
   const text = extractText(message.content);
   return text + extractImageNote(message.content);
-}
-
-function joinContent(existing: string, addition: string): string {
-  existing = existing.trim();
-  addition = addition.trim();
-  if (!existing) return addition;
-  if (!addition) return existing;
-  return `${existing}\n\n${addition}`;
 }
 
 function buildAssistantHeader(
@@ -350,9 +339,14 @@ function buildMainBranch(entries: PiEntry[]): PiEntry[] {
   } else if (leaves.length === 1) {
     leaf = leaves[0];
   } else {
-    leaf = leaves.reduce((a, b) =>
-      parseTimestamp(a.timestamp) > parseTimestamp(b.timestamp) ? a : b,
-    );
+    leaf = leaves.reduce((a, b) => {
+      // An unparseable timestamp never wins, matching the previous
+      // Date.parse() NaN comparison semantics.
+      const aMs = parseTimestamp(a.timestamp);
+      const bMs = parseTimestamp(b.timestamp);
+      if (aMs === undefined || bMs === undefined) return b;
+      return aMs > bMs ? a : b;
+    });
   }
 
   if (!leaf) return [];
@@ -632,11 +626,11 @@ function parseJsonlSession(data: PiEntry[]): {
   const timestamps: number[] = [];
   if (header) {
     const ms = parseTimestamp(header.timestamp);
-    if (!Number.isNaN(ms)) timestamps.push(ms);
+    if (ms !== undefined) timestamps.push(ms);
   }
   for (const entry of branch) {
     const ms = parseTimestamp(entry.timestamp);
-    if (!Number.isNaN(ms)) timestamps.push(ms);
+    if (ms !== undefined) timestamps.push(ms);
   }
   const createdMs = timestamps.length > 0 ? Math.min(...timestamps) : undefined;
   const updatedMs = timestamps.length > 0 ? Math.max(...timestamps) : undefined;

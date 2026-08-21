@@ -28,7 +28,7 @@ export interface SessionSummaryConfig {
 }
 
 export interface SummarizeConfig {
-  enabled: boolean;
+  enabled?: boolean;
   model?: string;
   always?: boolean;
   prompt?: string;
@@ -57,6 +57,46 @@ export function resolveNavigationConfig(navigation?: NavigationConfig): Resolved
   };
 }
 
+/** SessionSummaryConfig with every field resolved to its effective value. */
+export interface ResolvedSessionSummaryConfig {
+  enabled: boolean;
+  prompt?: string;
+  collapsed: boolean;
+}
+
+/** SummarizeConfig with every field resolved to its effective value. */
+export interface ResolvedSummarizeConfig {
+  enabled: boolean;
+  model?: string;
+  always: boolean;
+  prompt?: string;
+  thinkingPrompt?: string;
+  toolsPrompt?: string;
+  sessionSummary?: ResolvedSessionSummaryConfig;
+}
+
+// Single owner of summarize defaults; main() consumes resolved values.
+export function resolveSummarizeConfig(summarize?: SummarizeConfig): ResolvedSummarizeConfig {
+  if (!summarize) {
+    return { enabled: false, always: false };
+  }
+  return {
+    enabled: summarize.enabled ?? false,
+    always: summarize.always ?? false,
+    model: summarize.model,
+    prompt: summarize.prompt,
+    thinkingPrompt: summarize.thinkingPrompt,
+    toolsPrompt: summarize.toolsPrompt,
+    sessionSummary: summarize.sessionSummary
+      ? {
+          enabled: summarize.sessionSummary.enabled ?? false,
+          prompt: summarize.sessionSummary.prompt,
+          collapsed: summarize.sessionSummary.collapsed ?? true,
+        }
+      : undefined,
+  };
+}
+
 export interface UserConfig {
   raw?: boolean;
   extractor?: string;
@@ -75,8 +115,8 @@ export interface ResolvedConfig {
   picker: PickerConfig;
   claude: ClaudeConfig;
   pi: PiConfig;
-  summarize?: SummarizeConfig;
-  navigation?: NavigationConfig;
+  summarize?: ResolvedSummarizeConfig;
+  navigation?: ResolvedNavigationConfig;
 }
 
 export const DEFAULT_PICKER_CONFIG: PickerConfig = {
@@ -219,8 +259,8 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
         : DEFAULT_PI_CONFIG.sessionsPath,
       limit: config.pi?.limit ?? pickerLimit,
     },
-    summarize: config.summarize,
-    navigation: config.navigation,
+    summarize: config.summarize ? resolveSummarizeConfig(config.summarize) : undefined,
+    navigation: resolveNavigationConfig(config.navigation),
   };
 }
 

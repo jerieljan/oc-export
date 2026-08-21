@@ -1,6 +1,6 @@
-import type { NavigationConfig } from "../config.js";
+import type { ResolvedNavigationConfig } from "../config.js";
 
-export function scripts(navigation?: NavigationConfig): string {
+export function scripts(navigation?: ResolvedNavigationConfig): string {
   return `
 (function() {
   const toggle = document.getElementById('theme-toggle');
@@ -34,8 +34,8 @@ ${navigation ? scrubberScripts(navigation) : ""}})();
 `;
 }
 
-function scrubberScripts(navigation: NavigationConfig): string {
-  const progressBar = navigation.progressBar ?? true;
+function scrubberScripts(navigation: ResolvedNavigationConfig): string {
+  const progressBar = navigation.progressBar;
   const progressInit = progressBar
     ? "const progress = document.getElementById('turn-scrubber-progress');"
     : "";

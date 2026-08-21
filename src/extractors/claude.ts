@@ -1,5 +1,6 @@
 import type { ClaudeMessage, ClaudeUsage } from "../claude-message.js";
-import { formatTimestamp } from "../format.js";
+import { formatTimestamp, parseTimestamp } from "../format.js";
+import { unescapeClaudeString } from "../text.js";
 import type { SessionMeta, SessionStats, ToolCall, Turn } from "../types.js";
 import type { Extractor } from "./types.js";
 
@@ -46,12 +47,6 @@ function getMessages(data: unknown): ClaudeMessage[] {
   if (isNormalizedClaudeExport(data)) return data.messages ?? [];
   if (isClaudeMessageArray(data)) return data;
   return [];
-}
-
-function parseTimestamp(value: string | undefined): number | undefined {
-  if (!value) return undefined;
-  const ms = Date.parse(value);
-  return Number.isNaN(ms) ? undefined : ms;
 }
 
 const NON_CONVERSATION_TYPES = new Set([
@@ -175,16 +170,6 @@ function renderAttachment(message: ClaudeMessage): string {
 
   if (!body) return "";
   return `<!-- attachment: ${path} -->\n\n${unescapeClaudeString(body)}`;
-}
-
-function unescapeClaudeString(text: string): string {
-  return text
-    .replace(/\\n/g, "\n")
-    .replace(/\\t/g, "\t")
-    .replace(/\\r/g, "\r")
-    .replace(/\\"/g, '"')
-    .replace(/\\'/g, "'")
-    .replace(/\\\\/g, "\\");
 }
 
 const CLAUDE_META_TAG_NAMES = [

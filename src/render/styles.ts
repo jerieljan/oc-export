@@ -1,6 +1,6 @@
-import type { NavigationConfig } from "../config.js";
+import type { ResolvedNavigationConfig } from "../config.js";
 
-export function styles(navigation?: NavigationConfig): string {
+export function styles(navigation?: ResolvedNavigationConfig): string {
   return `
 :root {
   --font-body: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -849,9 +849,9 @@ ${navigation ? scrubberStyles(navigation) : ""}
 `;
 }
 
-function scrubberStyles(navigation: NavigationConfig): string {
-  const progressBar = navigation.progressBar ?? true;
-  const roleColor = navigation.roleColor ?? false;
+function scrubberStyles(navigation: ResolvedNavigationConfig): string {
+  const progressBar = navigation.progressBar;
+  const roleColor = navigation.roleColor;
   const progressStyles = progressBar
     ? `
 .turn-scrubber-progress {

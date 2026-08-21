@@ -1,10 +1,10 @@
 import { formatTimestamp } from "../format.js";
+import { joinContent } from "../text.js";
 import type { SessionMeta, SessionStats, SubagentLink, ToolCall, Turn } from "../types.js";
 import {
   buildAssistantHeader,
   collectSubagentLink,
   computeOpencodeStats,
-  joinContent,
   parseTaskState,
 } from "./opencode-shared.js";
 import type { Extractor } from "./types.js";

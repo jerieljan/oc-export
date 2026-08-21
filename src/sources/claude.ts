@@ -1,11 +1,8 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import type { ClaudeMessage } from "../claude-message.js";
-import { expandHome } from "../util.js";
+import { unescapeClaudeString } from "../text.js";
 import type { SessionRow, Source, SourceOptions } from "./types.js";
-
-const DEFAULT_PROJECTS_PATH = path.join(os.homedir(), ".claude/projects");
 
 interface ClaudeSessionIndexEntry {
   sessionId: string;
@@ -38,24 +35,16 @@ function isMetaPrompt(content: string): boolean {
 }
 
 function normalizePrompt(text: string): string {
-  const unescaped = text
-    .replace(/\\n/g, " ")
-    .replace(/\\t/g, " ")
-    .replace(/\\r/g, " ")
-    .replace(/\\"/g, '"')
-    .replace(/\\'/g, "'")
-    .replace(/\\\\/g, "\\");
-  const collapsed = unescaped.replace(/\s+/g, " ").trim();
+  const collapsed = unescapeClaudeString(text).replace(/\s+/g, " ").trim();
   return collapsed.length > 120 ? `${collapsed.slice(0, 117)}...` : collapsed;
 }
 
 function getProjectsPath(options: SourceOptions): string {
-  const configured = options.config.claude?.projectsPath;
-  return expandHome(configured ?? DEFAULT_PROJECTS_PATH);
+  return options.config.claude.projectsPath;
 }
 
 function getLimit(options: SourceOptions): number {
-  return options.config.claude?.limit ?? options.config.picker.limit;
+  return options.config.claude.limit;
 }
 
 function findSessionIndices(projectsPath: string): string[] {

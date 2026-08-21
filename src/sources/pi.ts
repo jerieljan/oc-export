@@ -1,10 +1,6 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { expandHome } from "../util.js";
 import type { SessionRow, Source, SourceOptions } from "./types.js";
-
-const DEFAULT_SESSIONS_PATH = path.join(os.homedir(), ".pi/agent/sessions");
 
 interface PiSessionFile {
   filePath: string;
@@ -15,11 +11,11 @@ interface PiSessionFile {
 }
 
 function getSessionsPath(options: SourceOptions): string {
-  return expandHome(options.config.pi?.sessionsPath ?? DEFAULT_SESSIONS_PATH);
+  return options.config.pi.sessionsPath;
 }
 
 function getLimit(options: SourceOptions): number {
-  return options.config.pi?.limit ?? options.config.picker.limit;
+  return options.config.pi.limit;
 }
 
 function truncate(text: string, max: number): string {

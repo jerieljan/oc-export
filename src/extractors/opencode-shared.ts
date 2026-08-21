@@ -19,14 +19,6 @@ export interface OpencodeStatMessage {
   parts: { type: string }[];
 }
 
-export function joinContent(existing: string, addition: string): string {
-  existing = existing.trim();
-  addition = addition.trim();
-  if (!existing) return addition;
-  if (!addition) return existing;
-  return `${existing}\n\n${addition}`;
-}
-
 /**
  * Extract the subagent session id and state from a task tool's output, which
  * embeds a marker like <task id="..." state="...">.

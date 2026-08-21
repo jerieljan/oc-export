@@ -82,7 +82,6 @@
       "type": "object",
       "additionalProperties": false,
       "description": "Options for replacing thinking and tool-call blocks with summaries via the llm CLI.",
-      "required": ["enabled"],
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -114,7 +113,6 @@
           "type": "object",
           "additionalProperties": false,
           "description": "Optional session-wide summary added at the top of the HTML.",
-          "required": ["enabled"],
           "properties": {
             "enabled": {
               "type": "boolean",

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import path from "node:path";
 import { parseArgs, showHelp } from "./src/cli-args.js";
-import { loadConfig } from "./src/config.js";
+import { loadConfig, resolveSummarizeConfig } from "./src/config.js";
 import { pickInteractive, pickSessionById } from "./src/pick.js";
 import { renderFile, renderFiles } from "./src/render.js";
+import type { SummarizeOptions } from "./src/summarize.js";
 import { resolveOutputBase, which } from "./src/util.js";
 
 function htmlOutputPath(outputArg: string): string {
@@ -29,18 +30,18 @@ async function main(): Promise<void> {
   }
   const sanitize = !(args.raw ?? config.raw);
 
-  const summarizeEnabled = config.summarize?.enabled === true;
-  const summarizeAlways = summarizeEnabled && config.summarize?.always === true;
+  const summarize = resolveSummarizeConfig(config.summarize);
   const summarizeRequested = args.summarize === true;
-  const doSummarize = summarizeEnabled && (summarizeRequested || summarizeAlways);
+  const doSummarize = summarize.enabled && (summarizeRequested || summarize.always);
 
-  if (summarizeRequested && !summarizeEnabled) {
+  if (summarizeRequested && !summarize.enabled) {
     console.error("Error: --summarize requires summarize.enabled to be true in config");
     process.exit(1);
   }
 
+  let summarizeOptions: SummarizeOptions | undefined;
   if (doSummarize) {
-    if (!config.summarize?.model) {
+    if (!summarize.model) {
       console.error("Error: Summarization requires summarize.model in config");
       process.exit(1);
     }
@@ -51,21 +52,17 @@ async function main(): Promise<void> {
       );
       process.exit(1);
     }
+
+    summarizeOptions = {
+      model: summarize.model,
+      prompt: summarize.prompt,
+      thinkingPrompt: summarize.thinkingPrompt,
+      toolsPrompt: summarize.toolsPrompt,
+      sessionSummary: summarize.sessionSummary?.enabled === true,
+      sessionSummaryPrompt: summarize.sessionSummary?.prompt,
+      sessionSummaryCollapsed: summarize.sessionSummary?.collapsed,
+    };
   }
-
-  const doSessionSummary = doSummarize && config.summarize?.sessionSummary?.enabled === true;
-
-  const summarizeOptions = doSummarize
-    ? {
-        model: config.summarize!.model!,
-        prompt: config.summarize!.prompt,
-        thinkingPrompt: config.summarize!.thinkingPrompt,
-        toolsPrompt: config.summarize!.toolsPrompt,
-        sessionSummary: doSessionSummary,
-        sessionSummaryPrompt: config.summarize!.sessionSummary?.prompt,
-        sessionSummaryCollapsed: config.summarize!.sessionSummary?.collapsed ?? true,
-      }
-    : undefined;
 
   if (args.session && args.files.length > 0) {
     console.error("Error: --session cannot be combined with input files");
