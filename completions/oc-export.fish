@@ -4,7 +4,7 @@
 
 # Options
 complete -c oc-export -s h -l help -f -d "Show help message"
-complete -c oc-export -l extractor -x -a "opencode claude" -d "Session source: opencode or claude"
+complete -c oc-export -l extractor -x -a "opencode opencode2 claude pi codex" -d "Session source"
 complete -c oc-export -l session -x -d "Export a session by full ID or last 8 characters"
 complete -c oc-export -l output -rF -d "Rename output files to <name>.jsonl and <name>.html"
 complete -c oc-export -l raw -f -d "Skip sanitization"

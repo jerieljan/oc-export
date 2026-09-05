@@ -1,6 +1,6 @@
 {
   "name": "oc-export",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Export and render chat sessions to standalone HTML files.",
   "type": "module",
   "bin": {
@@ -28,6 +28,7 @@
   },
   "keywords": [
     "opencode",
+    "codex",
     "chat",
     "export",
     "html",
