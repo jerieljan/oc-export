@@ -21,6 +21,12 @@ export interface PiConfig {
   limit: number;
 }
 
+export interface CodexConfig {
+  sessionsPath: string;
+  archivedPath: string;
+  limit: number;
+}
+
 export interface SessionSummaryConfig {
   enabled?: boolean;
   prompt?: string;
@@ -104,6 +110,7 @@ export interface UserConfig {
   picker?: Partial<PickerConfig>;
   claude?: Partial<ClaudeConfig>;
   pi?: Partial<PiConfig>;
+  codex?: Partial<CodexConfig>;
   summarize?: SummarizeConfig;
   navigation?: NavigationConfig;
 }
@@ -115,6 +122,7 @@ export interface ResolvedConfig {
   picker: PickerConfig;
   claude: ClaudeConfig;
   pi: PiConfig;
+  codex: CodexConfig;
   summarize?: ResolvedSummarizeConfig;
   navigation?: ResolvedNavigationConfig;
 }
@@ -134,12 +142,19 @@ export const DEFAULT_PI_CONFIG: PiConfig = {
   limit: DEFAULT_PICKER_CONFIG.limit,
 };
 
+export const DEFAULT_CODEX_CONFIG: CodexConfig = {
+  sessionsPath: path.join(os.homedir(), ".codex/sessions"),
+  archivedPath: path.join(os.homedir(), ".codex/archived_sessions"),
+  limit: DEFAULT_PICKER_CONFIG.limit,
+};
+
 export const DEFAULT_CONFIG: ResolvedConfig = {
   raw: false,
   extractor: "opencode",
   picker: DEFAULT_PICKER_CONFIG,
   claude: DEFAULT_CLAUDE_CONFIG,
   pi: DEFAULT_PI_CONFIG,
+  codex: DEFAULT_CODEX_CONFIG,
 };
 
 function validateBoolean(value: unknown, key: string): asserts value is boolean | undefined {
@@ -194,6 +209,14 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
 
   validateString(config.pi?.sessionsPath, "pi.sessionsPath");
   validatePositiveNumber(config.pi?.limit, "pi.limit");
+
+  if (config.codex !== undefined && typeof config.codex !== "object") {
+    throw new Error('Config error: "codex" must be an object');
+  }
+
+  validateString(config.codex?.sessionsPath, "codex.sessionsPath");
+  validateString(config.codex?.archivedPath, "codex.archivedPath");
+  validatePositiveNumber(config.codex?.limit, "codex.limit");
 
   if (config.summarize !== undefined && typeof config.summarize !== "object") {
     throw new Error('Config error: "summarize" must be an object');
@@ -259,6 +282,15 @@ function validateUserConfig(config: UserConfig): ResolvedConfig {
         : DEFAULT_PI_CONFIG.sessionsPath,
       limit: config.pi?.limit ?? pickerLimit,
     },
+    codex: {
+      sessionsPath: config.codex?.sessionsPath
+        ? expandHome(config.codex.sessionsPath)
+        : DEFAULT_CODEX_CONFIG.sessionsPath,
+      archivedPath: config.codex?.archivedPath
+        ? expandHome(config.codex.archivedPath)
+        : DEFAULT_CODEX_CONFIG.archivedPath,
+      limit: config.codex?.limit ?? pickerLimit,
+    },
     summarize: config.summarize ? resolveSummarizeConfig(config.summarize) : undefined,
     navigation: resolveNavigationConfig(config.navigation),
   };
@@ -273,6 +305,7 @@ function freshDefaultConfig(): ResolvedConfig {
     picker: { ...DEFAULT_CONFIG.picker },
     claude: { ...DEFAULT_CONFIG.claude },
     pi: { ...DEFAULT_CONFIG.pi },
+    codex: { ...DEFAULT_CONFIG.codex },
   };
 }
 

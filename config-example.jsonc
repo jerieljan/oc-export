@@ -14,7 +14,7 @@
   "raw": false,
 
   // Default session source. Valid values are "opencode", "opencode2", "claude",
-  // and "pi". Can be overridden with --extractor on the command line.
+  // "pi", and "codex". Can be overridden with --extractor on the command line.
   "extractor": "opencode",
 
   // Display name used on the user-turn badge in exported HTML. When set,
@@ -47,6 +47,17 @@
     "sessionsPath": "~/.pi/agent/sessions"
 
     // Number of recent Pi sessions shown in the interactive picker.
+    // When omitted, it falls back to picker.limit.
+    // ,"limit": 20
+  },
+
+  // Options for the OpenAI Codex source. Reads rollout files from the
+  // sessions and archived_sessions directories directly; no extra CLI needed.
+  "codex": {
+    "sessionsPath": "~/.codex/sessions",
+    "archivedPath": "~/.codex/archived_sessions"
+
+    // Number of recent Codex sessions shown in the interactive picker.
     // When omitted, it falls back to picker.limit.
     // ,"limit": 20
   },

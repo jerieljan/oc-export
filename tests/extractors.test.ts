@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { claudeExtractor } from "../src/extractors/claude.js";
+import { codexExtractor } from "../src/extractors/codex.js";
 import { extractSession, getExtractors } from "../src/extractors/index.js";
 import { kagiExtractor } from "../src/extractors/kagi.js";
 import { opencodeExtractor } from "../src/extractors/opencode.js";
@@ -268,6 +269,172 @@ const piSession = [
   },
 ];
 
+const codexSession = [
+  {
+    timestamp: "2026-09-05T02:51:43.426Z",
+    ordinal: 0,
+    type: "session_meta",
+    payload: {
+      session_id: "01codex000-0000-0000-0000-000000000000",
+      id: "01codex000-0000-0000-0000-000000000000",
+      timestamp: "2026-09-05T02:51:43.426Z",
+      cwd: "/tmp/project",
+      parent_thread_id: "01parent000-0000-0000-0000-000000000000",
+      thread_name: "Build the thing",
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:43.500Z",
+    ordinal: 1,
+    type: "turn_context",
+    payload: { turn_id: "t1", model: "gpt-6-astra", effort: "low" },
+  },
+  {
+    timestamp: "2026-09-05T02:51:44.000Z",
+    ordinal: 2,
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "developer",
+      content: [{ type: "input_text", text: "You are Codex..." }],
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:44.100Z",
+    ordinal: 3,
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: "<environment_context>\n  <cwd>/tmp/project</cwd>\n</environment_context>",
+        },
+      ],
+      internal_chat_message_metadata_passthrough: {
+        content_item_kinds: ["environments.environment_context"],
+      },
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:44.200Z",
+    ordinal: 4,
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "user",
+      content: [{ type: "input_text", text: "Ship it\n" }],
+      internal_chat_message_metadata_passthrough: { content_item_kinds: ["user.text"] },
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:45.000Z",
+    ordinal: 5,
+    type: "response_item",
+    payload: {
+      type: "reasoning",
+      summary: [{ type: "summary_text", text: "thinking out loud" }],
+      encrypted_content: "gAAAA...",
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:46.000Z",
+    ordinal: 6,
+    type: "response_item",
+    payload: {
+      type: "custom_tool_call",
+      call_id: "c1",
+      name: "exec",
+      input: 'text(await tools.exec_command({cmd:"ls"}));',
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:46.500Z",
+    ordinal: 7,
+    type: "response_item",
+    payload: {
+      type: "custom_tool_call_output",
+      call_id: "c1",
+      output: [{ type: "input_text", text: "ok" }],
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:47.000Z",
+    ordinal: 8,
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "assistant",
+      content: [{ type: "output_text", text: "Done!" }],
+      phase: "final",
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:48.000Z",
+    ordinal: 9,
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "user",
+      content: [{ type: "input_text", text: "More\n" }],
+      internal_chat_message_metadata_passthrough: { content_item_kinds: ["user.text"] },
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:49.000Z",
+    ordinal: 10,
+    type: "response_item",
+    payload: {
+      type: "function_call",
+      call_id: "c2",
+      name: "js",
+      namespace: "mcp__cua_repl",
+      arguments: '{"code":"x()"}',
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:49.500Z",
+    ordinal: 11,
+    type: "response_item",
+    payload: {
+      type: "function_call_output",
+      call_id: "c2",
+      output: [{ type: "input_text", text: "res" }],
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:50.000Z",
+    ordinal: 12,
+    type: "response_item",
+    payload: {
+      type: "message",
+      role: "assistant",
+      content: [{ type: "output_text", text: "Again done." }],
+      phase: "final",
+    },
+  },
+  {
+    timestamp: "2026-09-05T02:51:50.500Z",
+    ordinal: 13,
+    type: "event_msg",
+    payload: { type: "task_complete", turn_id: "t1", duration_ms: 2000 },
+  },
+  {
+    timestamp: "2026-09-05T02:51:51.000Z",
+    ordinal: 14,
+    type: "token_usage_record",
+    payload: {
+      thread_token_usage: {
+        input_tokens: 100,
+        cached_input_tokens: 50,
+        output_tokens: 20,
+        reasoning_output_tokens: 5,
+      },
+    },
+  },
+];
+
 // -- Matcher independence (regression guard for registration order) ----------
 
 describe("opencode matcher independence", () => {
@@ -287,6 +454,13 @@ describe("opencode matcher independence", () => {
   test("dispatch picks the right extractor regardless of intent", () => {
     expect(extractSession(opencodeV1Session).meta.sessionId).toBe("ses_v1abcdefgh");
     expect(extractSession(opencodeV2Session).meta.sessionId).toBe("ses_v2ijklmnop");
+  });
+
+  test("codex rollouts dispatch to codex despite the loose claude matcher", () => {
+    // Both matchers accept rollout records (they carry a `type` key), so the
+    // codex extractor must stay registered ahead of claude.
+    expect(claudeExtractor.canExtract(codexSession)).toBe(true);
+    expect(extractSession(codexSession).meta.title).toBe("Build the thing");
   });
 });
 
@@ -449,6 +623,143 @@ describe("pi extractor", () => {
   });
 });
 
+// -- Codex record builders for minimal rollout fixtures --------------------------
+
+const codexMetaRecord = () => ({
+  timestamp: "2026-09-05T02:51:43.426Z",
+  ordinal: 0,
+  type: "session_meta",
+  payload: {
+    session_id: "01codex000-0000-0000-0000-000000000000",
+    id: "01codex000-0000-0000-0000-000000000000",
+    timestamp: "2026-09-05T02:51:43.426Z",
+    cwd: "/tmp/project",
+  },
+});
+
+const codexTurnContextRecord = (turnId: string, model: string, ordinal: number) => ({
+  timestamp: "2026-09-05T02:51:43.500Z",
+  ordinal,
+  type: "turn_context",
+  payload: { turn_id: turnId, model, effort: "low" },
+});
+
+const codexUserMessageRecord = (text: string, ordinal: number) => ({
+  timestamp: "2026-09-05T02:51:44.000Z",
+  ordinal,
+  type: "response_item",
+  payload: {
+    type: "message",
+    role: "user",
+    content: [{ type: "input_text", text }],
+    internal_chat_message_metadata_passthrough: { content_item_kinds: ["user.text"] },
+  },
+});
+
+const codexAssistantMessageRecord = (text: string, ordinal: number) => ({
+  timestamp: "2026-09-05T02:51:45.000Z",
+  ordinal,
+  type: "response_item",
+  payload: {
+    type: "message",
+    role: "assistant",
+    content: [{ type: "output_text", text }],
+  },
+});
+
+describe("codex extractor", () => {
+  const { meta, turns } = extractSession(codexSession);
+
+  test("parses session metadata, stats, and the injected title", () => {
+    expect(meta.title).toBe("Build the thing");
+    expect(meta.sessionId).toBe("01codex000-0000-0000-0000-000000000000");
+    expect(meta.parentSessionId).toBe("01parent000-0000-0000-0000-000000000000");
+    expect(meta.stats?.tokensInput).toBe(100);
+    expect(meta.stats?.tokensCacheRead).toBe(50);
+    expect(meta.stats?.tokensOutput).toBe(20);
+    expect(meta.stats?.tokensReasoning).toBe(5);
+    expect(meta.stats?.userMessages).toBe(2);
+    expect(meta.stats?.assistantMessages).toBe(2);
+    expect(meta.stats?.reasoningParts).toBe(1);
+    expect(meta.stats?.toolParts).toBe(2);
+  });
+
+  test("builds turns from rollout records and skips injected user messages", () => {
+    expect(turns.map((t) => t.role)).toEqual(["user", "assistant", "user", "assistant"]);
+    expect(turns[0]?.content).toBe("Ship it");
+    expect(turns[2]?.content).toBe("More");
+  });
+
+  test("collects reasoning, tool calls, and output pairing", () => {
+    const firstAssistant = turns[1]!;
+    expect(firstAssistant.thinking).toEqual(["thinking out loud"]);
+    expect(firstAssistant.content).toBe("Done!");
+    expect(firstAssistant.tools?.[0]).toMatchObject({ name: "exec", output: "ok" });
+    expect(firstAssistant.header).toBe("gpt-6-astra · low · 2.0s");
+
+    const secondAssistant = turns[3]!;
+    expect(secondAssistant.tools?.[0]).toMatchObject({
+      name: "mcp__cua_repl.js",
+      output: "res",
+    });
+    expect(secondAssistant.content).toBe("Again done.");
+  });
+
+  test("preserves image-only user turns between assistant responses", () => {
+    const imageOnly = [
+      codexMetaRecord(),
+      codexTurnContextRecord("t1", "model-a", 1),
+      codexUserMessageRecord("hello", 2),
+      codexAssistantMessageRecord("one", 3),
+      {
+        timestamp: "2026-09-05T02:51:46.000Z",
+        ordinal: 4,
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_image", image_url: "data:image/png;base64,AAAA" }],
+        },
+      },
+      codexAssistantMessageRecord("two", 5),
+    ];
+    const result = extractSession(imageOnly);
+    expect(result.turns.map((t) => t.role)).toEqual(["user", "assistant", "user", "assistant"]);
+    expect(result.turns[1]?.content).toBe("one");
+    expect(result.turns[2]?.content).toBe("[1 image(s) omitted]");
+    expect(result.turns[3]?.content).toBe("two");
+  });
+
+  test("keeps each assistant turn under its own turn context", () => {
+    const twoContexts = [
+      codexMetaRecord(),
+      codexTurnContextRecord("t1", "model-a", 1),
+      codexUserMessageRecord("first", 2),
+      codexAssistantMessageRecord("answer one", 3),
+      codexTurnContextRecord("t2", "model-b", 4),
+      codexUserMessageRecord("second", 5),
+      codexAssistantMessageRecord("answer two", 6),
+      {
+        timestamp: "2026-09-05T02:51:48.000Z",
+        ordinal: 7,
+        type: "event_msg",
+        payload: { type: "task_complete", turn_id: "t1", duration_ms: 1000 },
+      },
+      {
+        timestamp: "2026-09-05T02:51:49.000Z",
+        ordinal: 8,
+        type: "event_msg",
+        payload: { type: "task_complete", turn_id: "t2", duration_ms: 2000 },
+      },
+    ];
+    const result = extractSession(twoContexts);
+    const first = result.turns[1]!;
+    const second = result.turns[3]!;
+    expect(first.header).toBe("model-a · low · 1.0s");
+    expect(second.header).toBe("model-b · low · 2.0s");
+  });
+});
+
 // -- Dispatch -------------------------------------------------------------------
 
 describe("extractSession dispatch", () => {
@@ -460,12 +771,13 @@ describe("extractSession dispatch", () => {
     const names = getExtractors()
       .map((e) => e.name)
       .sort();
-    expect(names).toEqual(["claude", "kagi", "opencode", "opencode2", "openwebui", "pi"]);
+    expect(names).toEqual(["claude", "codex", "kagi", "opencode", "opencode2", "openwebui", "pi"]);
   });
 
   test("every registered extractor accepts its own fixture", () => {
     // Guards against a future matcher change silently breaking dispatch.
     expect(claudeExtractor.canExtract(claudeSession)).toBe(true);
+    expect(codexExtractor.canExtract(codexSession)).toBe(true);
     expect(kagiExtractor.canExtract(kagiSession)).toBe(true);
     expect(openWebUIExtractor.canExtract(openWebUISession)).toBe(true);
     expect(piExtractor.canExtract(piSession)).toBe(true);

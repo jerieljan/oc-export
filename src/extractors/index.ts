@@ -1,5 +1,6 @@
 import type { SessionMeta, Turn } from "../types.js";
 import { claudeExtractor } from "./claude.js";
+import { codexExtractor } from "./codex.js";
 import { kagiExtractor } from "./kagi.js";
 import { opencodeExtractor } from "./opencode.js";
 import { opencode2Extractor } from "./opencode2.js";
@@ -8,6 +9,9 @@ import { piExtractor } from "./pi.js";
 import type { Extractor } from "./types.js";
 
 const extractors: Extractor[] = [
+  // Codex rollout records carry a top-level `type`, which the looser Claude
+  // matcher also accepts; Codex must be tried first.
+  codexExtractor,
   openWebUIExtractor,
   kagiExtractor,
   piExtractor,

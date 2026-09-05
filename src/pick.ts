@@ -6,6 +6,7 @@ import { sanitizePathForDisplay } from "./sanitize.js";
 import { getSource, type Source } from "./sources/index.js";
 import type { SessionRow } from "./sources/types.js";
 import type { SummarizeOptions } from "./summarize.js";
+import type { SubagentLink } from "./types.js";
 import { last8, resolveOutputBase } from "./util.js";
 
 export interface PickOptions {
@@ -59,6 +60,7 @@ async function exportAndRenderSingleSession(
   htmlPath: string,
   parentContext: ExportContext = {},
   totalCost?: number,
+  subagentLinks?: SubagentLink[],
 ): Promise<string> {
   const { sanitize = true, config = DEFAULT_CONFIG, summarize } = options;
 
@@ -82,6 +84,7 @@ async function exportAndRenderSingleSession(
     parentOutputPath,
     parentTitle: parentContext.parentTitle,
     totalCost,
+    subagentLinks,
   });
 
   console.log(`Done: ${displayJson} → ${displayHtml}`);
@@ -106,6 +109,10 @@ export async function exportAndRenderSession(id: string, options: PickOptions = 
   }
 
   const parentTotalCost = totalCost > parentCost ? totalCost : undefined;
+  const subagentLinks: SubagentLink[] = children.map((child) => ({
+    sessionId: child.id,
+    title: child.title,
+  }));
   const parentHtmlPath = await exportAndRenderSingleSession(
     id,
     options,
@@ -114,6 +121,7 @@ export async function exportAndRenderSession(id: string, options: PickOptions = 
     htmlPath,
     {},
     parentTotalCost,
+    subagentLinks,
   );
 
   if (children.length === 0) {

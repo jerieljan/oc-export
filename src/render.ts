@@ -23,7 +23,7 @@ import {
 import { styles } from "./render/styles.js";
 import { sanitizePathForDisplay, sanitizeText } from "./sanitize.js";
 import { type SummarizeOptions, summarizeSession, summarizeTurns } from "./summarize.js";
-import type { SessionMeta, Turn } from "./types.js";
+import type { SessionMeta, SubagentLink, Turn } from "./types.js";
 
 export interface RenderOptions {
   sanitize?: boolean;
@@ -34,6 +34,9 @@ export interface RenderOptions {
   parentOutputPath?: string;
   parentTitle?: string;
   totalCost?: number;
+  // Child sessions discovered outside the exported data (e.g. the Codex
+  // rollout scan). Merged into meta.subagents for parent-to-child links.
+  subagentLinks?: SubagentLink[];
 }
 
 function sanitizeSession(meta: SessionMeta, turns: Turn[]): void {
@@ -271,6 +274,19 @@ export async function renderFile(inputPath: string, options: RenderOptions = {})
 
   const parsed = parseInputFile(resolved);
   const { meta, turns } = extractSession(parsed);
+
+  // Sources that discover child sessions outside the exported data inject
+  // them here. Dedupe by session id so extractors that populate subagents
+  // from the data itself keep precedence.
+  if (options.subagentLinks && options.subagentLinks.length > 0) {
+    const known = new Set((meta.subagents ?? []).map((sub) => sub.sessionId));
+    const injected = options.subagentLinks.filter(
+      (link) => link.sessionId !== meta.sessionId && !known.has(link.sessionId),
+    );
+    if (injected.length > 0) {
+      meta.subagents = [...(meta.subagents ?? []), ...injected];
+    }
+  }
 
   if (sanitize) {
     sanitizeSession(meta, turns);

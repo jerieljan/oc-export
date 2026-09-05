@@ -47,6 +47,7 @@ These options are configured either via flags or the config.jsonc file. See the 
 - The `opencode` CLI must be installed and on PATH for `--session` and interactive picker modes.
 - When using the OpenCode V2 extractor, the `opencode2` CLI must be installed and on PATH.
 - When using the Claude Code extractor, this project reads `~/.claude/projects` directly.
+- When using the Codex extractor, this project reads `~/.codex` directly; no extra CLI is needed.
 - When using summarization, the `llm` CLI must be installed.
 
 ### Instructions
@@ -102,6 +103,7 @@ These are the supported formats. This is a work in progress.
 - **OpenCode V2 JSON exports** via `opencode2 export` (experimental)
 - **Claude Code JSONL exports** (experimental)
 - **Pi JSONL exports** (experimental)
+- **OpenAI Codex rollout JSONL exports** (experimental)
 - **Kagi Assistant JSON exports**
 - **Open WebUI JSON exports**
 
@@ -109,7 +111,9 @@ Open WebUI exports may contain multiple conversation branches; only the currentl
 
 Claude Code sessions are read directly from `~/.claude/projects`. Subagent conversations are inlined into the parent session as tool-call blocks.
 
-OpenCode and OpenCode V2 sessions that spawn subagents (or forks) are exported as a family: the parent HTML links to each child session and the child HTML links back to the parent. Choosing a parent session in the picker or via `--session` exports the parent and all of its children.
+Codex sessions are read directly from `~/.codex/sessions` and `~/.codex/archived_sessions` (modern rollout format; legacy pre-0.4x rollouts are skipped). Session titles come from `~/.codex/session_index.jsonl` when available, falling back to the first user prompt. Codex subagent sessions (rollouts with a `parent_thread_id`) are exported as a family: the parent HTML links to each child and the child links back to the parent. Reasoning text is only available when Codex stored readable summaries; encrypted reasoning cannot be recovered.
+
+OpenCode, OpenCode V2, and Codex sessions that spawn subagents (or forks) are exported as a family: the parent HTML links to each child session and the child HTML links back to the parent. Choosing a parent session in the picker or via `--session` exports the parent and all of its children.
 
 Additional formats can be added by implementing an extractor in `src/extractors/` and registering it in `src/extractors/index.ts`.
 
@@ -149,6 +153,16 @@ oc-export --extractor opencode2 --output report
 # Produces: report.jsonl, report.html
 ```
 
+Use OpenAI Codex sessions:
+
+```bash
+oc-export --extractor codex
+# Produces: session-id.jsonl, session-id.html
+
+oc-export --extractor codex --output report
+# Produces: report.jsonl, report.html
+```
+
 Pick a session and write both files with custom names:
 
 ```bash
@@ -184,6 +198,11 @@ oc-export --extractor claude --session abc123 --output report
 # With the OpenCode V2 source:
 oc-export --extractor opencode2 --session abc123
 oc-export --extractor opencode2 --session abc123 --output report
+# Produces: report.jsonl, report.html
+
+# With the OpenAI Codex source:
+oc-export --extractor codex --session abc123
+oc-export --extractor codex --session abc123 --output report
 # Produces: report.jsonl, report.html
 ```
 
@@ -257,7 +276,7 @@ oc-export --config ~/.oc-export.jsonc session.json
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `raw` | boolean | `false` | Skip sanitization by default |
-| `extractor` | string | `opencode` | Default session source: `opencode`, `opencode2`, `claude`, or `pi` |
+| `extractor` | string | `opencode` | Default session source: `opencode`, `opencode2`, `claude`, `pi`, or `codex` |
 | `username` | string | — | Display name used on the user-turn badge, rendered in uppercase |
 | `picker.databasePath` | string | `~/.local/share/opencode/opencode.db` | Path to the OpenCode SQLite database |
 | `picker.limit` | number | `20` | Number of recent sessions shown in the interactive picker |
@@ -265,6 +284,9 @@ oc-export --config ~/.oc-export.jsonc session.json
 | `claude.limit` | number | `picker.limit` | Number of recent Claude sessions shown in the interactive picker |
 | `pi.sessionsPath` | string | `~/.pi/agent/sessions` | Path to the Pi sessions directory |
 | `pi.limit` | number | `picker.limit` | Number of recent Pi sessions shown in the interactive picker |
+| `codex.sessionsPath` | string | `~/.codex/sessions` | Path to the Codex sessions directory (rollout files) |
+| `codex.archivedPath` | string | `~/.codex/archived_sessions` | Path to the Codex archived sessions directory |
+| `codex.limit` | number | `picker.limit` | Number of recent Codex sessions shown in the interactive picker |
 | `summarize.enabled` | boolean | `false` | Master switch for the summarize feature |
 | `summarize.model` | string | — | Model ID passed to `llm -m`; required when summarizing |
 | `summarize.always` | boolean | `false` | Run summarization by default without `--summarize` |

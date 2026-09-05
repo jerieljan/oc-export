@@ -18,9 +18,9 @@
     },
     "extractor": {
       "type": "string",
-      "enum": ["opencode", "opencode2", "claude", "pi"],
+      "enum": ["opencode", "opencode2", "claude", "pi", "codex"],
       "default": "opencode",
-      "description": "Default session source. Valid values are 'opencode', 'opencode2', 'claude', and 'pi'."
+      "description": "Default session source. Valid values are 'opencode', 'opencode2', 'claude', 'pi', and 'codex'."
     },
     "username": {
       "type": "string",
@@ -75,6 +75,28 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Number of recent Pi sessions shown in the interactive picker. Defaults to picker.limit."
+        }
+      }
+    },
+    "codex": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Options for the OpenAI Codex source.",
+      "properties": {
+        "sessionsPath": {
+          "type": "string",
+          "default": "~/.codex/sessions",
+          "description": "Path to the Codex sessions directory containing rollout files. The ~ prefix is expanded to the home directory."
+        },
+        "archivedPath": {
+          "type": "string",
+          "default": "~/.codex/archived_sessions",
+          "description": "Path to the Codex archived sessions directory. Archived rollouts are scanned alongside active sessions."
+        },
+        "limit": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Number of recent Codex sessions shown in the interactive picker. Defaults to picker.limit."
         }
       }
     },
