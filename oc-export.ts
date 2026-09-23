@@ -2,6 +2,7 @@
 import path from "node:path";
 import { parseArgs, showHelp } from "./src/cli-args.js";
 import { loadConfig, resolveSummarizeConfig } from "./src/config.js";
+import { listSessions } from "./src/list.js";
 import { pickInteractive, pickSessionById } from "./src/pick.js";
 import { renderFile, renderFiles } from "./src/render.js";
 import type { SummarizeOptions } from "./src/summarize.js";
@@ -27,6 +28,10 @@ async function main(): Promise<void> {
   const config = loadConfig(args.config);
   if (args.extractor) {
     config.extractor = args.extractor;
+  }
+  if (args.command === "ls") {
+    await listSessions(config, args.directory);
+    return;
   }
   const sanitize = !(args.raw ?? config.raw);
 

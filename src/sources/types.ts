@@ -1,7 +1,7 @@
 import type { ResolvedConfig } from "../config.js";
 
 // A row returned by any session source for the interactive picker and
-// --session lookups.
+// ls output and --session lookups.
 export interface SessionRow {
   id: string;
   title: string;
@@ -13,6 +13,8 @@ export interface SessionRow {
 // Options passed to source methods.
 export interface SourceOptions {
   config: ResolvedConfig;
+  /** Optional exact working-directory filter, applied before the session limit. */
+  directory?: string;
 }
 
 // A session source abstracts where oc-export reads sessions from.
@@ -22,7 +24,7 @@ export interface Source {
   name: string;
   label: string;
 
-  // List recent sessions for the interactive picker.
+  // List recent sessions for the interactive picker and ls.
   listSessions(options: SourceOptions): Promise<SessionRow[]> | SessionRow[];
 
   // Find a session by full ID or a unique last-N suffix.

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { openDatabase } from "../db.js";
 import { spawnToFile } from "../util.js";
+import { selectRecentSessions } from "./session-list.js";
 import type { SessionRow, Source, SourceOptions } from "./types.js";
 
 /**
@@ -50,14 +51,15 @@ export function createSqliteSessionSource(definition: SqliteSourceDefinition): S
   }
 
   async function listSessions(options: SourceOptions): Promise<SessionRow[]> {
-    return queryRows(
+    const rows = await queryRows(
       `SELECT ${SESSION_COLUMNS}
        FROM ${table}
        ORDER BY time_updated DESC
        LIMIT $limit`,
-      { $limit: options.config.picker.limit },
+      { $limit: options.directory === undefined ? options.config.picker.limit : -1 },
       options,
     );
+    return selectRecentSessions(rows, options.config.picker.limit, options.directory);
   }
 
   async function findChildSessions(

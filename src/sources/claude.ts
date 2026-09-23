@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ClaudeMessage } from "../claude-message.js";
 import { unescapeClaudeString } from "../text.js";
+import { selectRecentSessions } from "./session-list.js";
 import type { SessionRow, Source, SourceOptions } from "./types.js";
 
 interface ClaudeSessionIndexEntry {
@@ -92,8 +93,7 @@ export function listSessions(options: SourceOptions): SessionRow[] {
 
   const entries = listSessionEntries(projectsPath);
   const rows = entries.map(entryToRow);
-  rows.sort((a, b) => b.time_updated - a.time_updated);
-  return rows.slice(0, limit);
+  return selectRecentSessions(rows, limit, options.directory);
 }
 
 export function findSessionById(idOrSuffix: string, options: SourceOptions): SessionRow {

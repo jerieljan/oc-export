@@ -2,6 +2,8 @@ import { DEFAULT_CONFIG, DEFAULT_CONFIG_PATH } from "./config.js";
 import { getSources } from "./sources/index.js";
 
 export interface ParsedArgs {
+  command?: "ls";
+  directory?: string;
   extractor?: string;
   raw?: boolean;
   config?: string;
@@ -26,8 +28,13 @@ function sourceList(): string {
 
 export function showHelp(): void {
   console.log(`Usage: oc-export [options] [file.json ...]
+       oc-export ls [options] [directory]
 
 Render chat sessions to standalone HTML files.
+
+Commands:
+  ls                 List recent sessions without exporting or prompting
+                     Optional directory filters by exact working directory
 
 Options:
   --extractor <name>  Session source: ${sourceList()}
@@ -44,6 +51,8 @@ Config file:
   CLI flags override config values. Config values override defaults.
 
 Examples:
+  oc-export ls --extractor codex .         # recent Codex sessions in this directory
+  oc-export ls                            # recent sessions from the configured source
   oc-export                               # interactive picker (default: opencode)
   oc-export --extractor claude            # interactive picker for Claude Code
   oc-export --extractor pi                # interactive picker for Pi
@@ -133,8 +142,31 @@ export function parseArgs(argv: string[]): ParseArgsResult {
         if (flag.startsWith("-")) {
           return { help: false, error: `Unknown option ${flag}` };
         }
-        args.files.push(arg);
+        if (arg === "ls" && args.files.length === 0 && args.command === undefined) {
+          args.command = "ls";
+        } else {
+          args.files.push(arg);
+        }
     }
+  }
+
+  if (args.command === "ls") {
+    if (args.files.length > 1) {
+      return { help: false, error: "ls accepts at most one directory" };
+    }
+    if (
+      args.session !== undefined ||
+      args.output !== undefined ||
+      args.summarize !== undefined ||
+      args.raw !== undefined
+    ) {
+      return {
+        help: false,
+        error: "ls cannot be combined with --session, --output, --summarize, --raw, or --no-raw",
+      };
+    }
+    args.directory = args.files[0];
+    args.files = [];
   }
 
   return { help: false, args };

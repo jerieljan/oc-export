@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { selectRecentSessions } from "./session-list.js";
 import type { SessionRow, Source, SourceOptions } from "./types.js";
 
 interface PiSessionFile {
@@ -147,8 +148,7 @@ export function listSessions(options: SourceOptions): SessionRow[] {
   }
 
   const files = scanSessions(sessionsPath);
-  files.sort((a, b) => b.time_updated - a.time_updated);
-  return files.slice(0, limit).map(mapToRow);
+  return selectRecentSessions(files.map(mapToRow), limit, options.directory);
 }
 
 export function findSessionById(idOrSuffix: string, options: SourceOptions): SessionRow {

@@ -13,4 +13,7 @@ complete -c oc-export -l summarize -f -d "Summarize thinking and tool-call block
 complete -c oc-export -l config -rF -d "Use a custom config file"
 
 # Positional arguments: JSON/JSONL export files
-complete -c oc-export -n "not __fish_seen_argument --session --output --help -h" -F
+complete -c oc-export -n "not __fish_seen_subcommand_from ls; and not __fish_seen_argument --session --output --help -h" -F
+
+complete -c oc-export -n "not __fish_seen_subcommand_from ls" -a ls -d "List recent sessions"
+complete -c oc-export -n "__fish_seen_subcommand_from ls" -a "(__fish_complete_directories)" -f

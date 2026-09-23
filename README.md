@@ -127,6 +127,26 @@ If you have the project installed globally, here are the commands that you can e
 
 TIP: If you're using the fish shell, a completions file is available in `completions/oc-export.fish`. Place it on your fish completions directory.
 
+List recent sessions without a prompt or an export:
+
+```sh
+oc-export ls                             # uses the configured extractor
+oc-export ls --extractor codex            # recent Codex sessions
+oc-export ls --extractor codex .          # sessions in the current directory
+oc-export ls --extractor claude /path/to/project
+```
+
+`ls` prints full session IDs, UTC update times, working directories, and titles as
+tab-separated columns. Use an ID with `--session` to export it. Listings show local
+metadata as stored, without export sanitization. An empty result prints
+`No sessions found.` and exits successfully.
+
+The optional path matches the exact working directory, not its subdirectories.
+Relative paths, trailing slashes, and symlinks are resolved before matching.
+Filtering happens before the configured limit (`picker.limit`, or `claude.limit`,
+`pi.limit`, or `codex.limit` for that source). Results show the newest sessions first.
+`--config` and `--extractor` work as usual; export-only flags are not accepted by `ls`.
+
 Run the interactive picker to choose a recent session:
 
 ```bash
@@ -279,14 +299,14 @@ oc-export --config ~/.oc-export.jsonc session.json
 | `extractor` | string | `opencode` | Default session source: `opencode`, `opencode2`, `claude`, `pi`, or `codex` |
 | `username` | string | — | Display name used on the user-turn badge, rendered in uppercase |
 | `picker.databasePath` | string | `~/.local/share/opencode/opencode.db` | Path to the OpenCode SQLite database |
-| `picker.limit` | number | `20` | Number of recent sessions shown in the interactive picker |
+| `picker.limit` | number | `20` | Number of recent sessions shown in the interactive picker and `ls` |
 | `claude.projectsPath` | string | `~/.claude/projects` | Path to the Claude Code projects directory |
-| `claude.limit` | number | `picker.limit` | Number of recent Claude sessions shown in the interactive picker |
+| `claude.limit` | number | `picker.limit` | Number of recent Claude sessions shown in the interactive picker and `ls` |
 | `pi.sessionsPath` | string | `~/.pi/agent/sessions` | Path to the Pi sessions directory |
-| `pi.limit` | number | `picker.limit` | Number of recent Pi sessions shown in the interactive picker |
+| `pi.limit` | number | `picker.limit` | Number of recent Pi sessions shown in the interactive picker and `ls` |
 | `codex.sessionsPath` | string | `~/.codex/sessions` | Path to the Codex sessions directory (rollout files) |
 | `codex.archivedPath` | string | `~/.codex/archived_sessions` | Path to the Codex archived sessions directory |
-| `codex.limit` | number | `picker.limit` | Number of recent Codex sessions shown in the interactive picker |
+| `codex.limit` | number | `picker.limit` | Number of recent Codex sessions shown in the interactive picker and `ls` |
 | `summarize.enabled` | boolean | `false` | Master switch for the summarize feature |
 | `summarize.model` | string | — | Model ID passed to `llm -m`; required when summarizing |
 | `summarize.always` | boolean | `false` | Run summarization by default without `--summarize` |
