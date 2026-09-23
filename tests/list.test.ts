@@ -20,7 +20,16 @@ describe("ls", () => {
       });
     }
     expect(parseArgs(["./ls"])).toEqual({ help: false, args: { files: ["./ls"] } });
-    expect(parseArgs(["ls", "--help"])).toEqual({ help: true });
+    expect(parseArgs(["ls", "--help"])).toEqual({ help: true, command: "ls" });
+  });
+
+  test("JSON output is limited to ls", () => {
+    expect(parseArgs(["ls", "--json"])).toEqual({
+      help: false,
+      args: { command: "ls", json: true, directory: undefined, files: [] },
+    });
+    expect(parseArgs(["--json"])).toHaveProperty("error");
+    expect(parseArgs(["ls", "--json=true"])).toHaveProperty("error");
   });
 
   test("rejects extra paths and export-only flags", () => {
@@ -140,6 +149,14 @@ describe("ls", () => {
           expect(output).not.toContain("child");
           expect(output).not.toContain("unknown");
         }
+        const json = run("--json", target);
+        expect(json.exitCode).toBe(0);
+        expect(JSON.parse(json.stdout.toString())).toEqual([
+          expect.objectContaining({ id: "new-match", directory: target, time_updated: 2000 }),
+        ]);
+        const emptyJson = run("--json", path.join(root, "missing"));
+        expect(emptyJson.exitCode).toBe(0);
+        expect(JSON.parse(emptyJson.stdout.toString())).toEqual([]);
         const empty = run(path.join(root, "missing"));
         expect(empty.exitCode).toBe(0);
         expect(empty.stdout.toString().trim()).toBe("No sessions found.");

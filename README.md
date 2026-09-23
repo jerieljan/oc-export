@@ -125,13 +125,44 @@ This project started as a personal tool, so most of the application code is AI-g
 
 If you have the project installed globally, here are the commands that you can execute:
 
-TIP: If you're using the fish shell, a completions file is available in `completions/oc-export.fish`. Place it on your fish completions directory.
+Once published, replace `oc-export` with `npx oc-export` in these examples if you
+prefer not to install it globally. Run `npx oc-export --help` for export and render
+options, or `npx oc-export ls --help` for listing options.
+
+### Fish completion
+
+Install the command and its bundled completions (after publication):
+
+```fish
+npm install -g oc-export
+mkdir -p ~/.config/fish/completions
+cp (npm root -g)/oc-export/completions/oc-export.fish ~/.config/fish/completions/
+source ~/.config/fish/completions/oc-export.fish
+```
+
+For development, copy `completions/oc-export.fish` from this repository instead.
+The built `oc-export` command must be on `PATH` for dynamic session suggestions.
+
+Type `oc-export --extractor codex --session `, then press Tab. Fish suggests full
+session IDs with their titles and working directories. `--session=` also works.
+Pressing Tab immediately after `--session` completes the option itself; add a
+space to complete its value.
+
+Suggestions use `ls` and respect `--extractor` and `--config` before the cursor,
+including `--flag=value` syntax. Without an explicit extractor, they use the
+configured source. They show the same recent sessions and limits as `ls`, across
+all working directories. Missing sources and empty lists produce no suggestions.
+Completion does not export sessions or install packages. Use the installed
+`oc-export` command for this completion setup; `npx` completion depends on your
+shell's separate `npx` support.
+
+### List sessions
 
 List recent sessions without a prompt or an export:
 
 ```sh
 oc-export ls                             # uses the configured extractor
-oc-export ls --extractor codex            # recent Codex sessions
+oc-export ls --extractor codex           # recent Codex sessions
 oc-export ls --extractor codex .          # sessions in the current directory
 oc-export ls --extractor claude /path/to/project
 ```
@@ -140,6 +171,20 @@ oc-export ls --extractor claude /path/to/project
 tab-separated columns. Use an ID with `--session` to export it. Listings show local
 metadata as stored, without export sanitization. An empty result prints
 `No sessions found.` and exits successfully.
+
+For scripts and agents, use JSON output:
+
+```sh
+npx oc-export ls --extractor codex --json
+npx oc-export --extractor codex --session SESSION_ID --output report
+```
+
+Replace `SESSION_ID` with a full `id` returned by the first command. `--json`
+prints an array of objects with `id`, `title`, `directory`, and `time_updated`
+(Unix milliseconds); sources may also include `cost`. An empty result is `[]`.
+Errors go to stderr with exit status 1; successful listings exit with status 0.
+Both listing modes expose local metadata without sanitization. Neither prompts
+for input or writes export files.
 
 The optional path matches the exact working directory, not its subdirectories.
 Relative paths, trailing slashes, and symlinks are resolved before matching.

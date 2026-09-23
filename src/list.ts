@@ -17,8 +17,12 @@ export function formatSessionList(rows: SessionRow[]): string {
   ].join("\n");
 }
 
-export async function listSessions(config: ResolvedConfig, directory?: string): Promise<void> {
+export async function listSessions(
+  config: ResolvedConfig,
+  directory?: string,
+  json = false,
+): Promise<void> {
   const source = getSource(config.extractor);
   const rows = await source.listSessions({ config, directory });
-  console.log(formatSessionList(rows));
+  console.log(json ? JSON.stringify(rows) : formatSessionList(rows));
 }

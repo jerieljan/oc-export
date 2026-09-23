@@ -1,19 +1,49 @@
-# Fish completions for oc-export
-# Copy this file to ~/.config/fish/completions/oc-export.fish
-# Or keep it in this repo and run: ln -s (realpath completions/oc-export.fish) ~/.config/fish/completions/
+# Copy to ~/.config/fish/completions/oc-export.fish, then restart Fish or source it.
+# Dynamic suggestions need oc-export on PATH (for example, npm install -g oc-export).
 
-# Options
-complete -c oc-export -s h -l help -f -d "Show help message"
-complete -c oc-export -l extractor -x -a "opencode opencode2 claude pi codex" -d "Session source"
-complete -c oc-export -l session -x -d "Export a session by full ID or last 8 characters"
-complete -c oc-export -l output -rF -d "Rename output files to <name>.jsonl and <name>.html"
-complete -c oc-export -l raw -f -d "Skip sanitization"
-complete -c oc-export -l no-raw -f -d "Enable sanitization (default, overrides raw: true in config)"
-complete -c oc-export -l summarize -f -d "Summarize thinking and tool-call blocks using llm"
-complete -c oc-export -l config -rF -d "Use a custom config file"
+function __oc_export_sessions
+    set -l tokens (commandline --current-process --tokens-expanded --cut-at-cursor)
+    set -l options
+    set -l pending
+    # Forward only source/config options. Never evaluate command-line text.
+    for token in $tokens[2..-1]
+        if test -n "$pending"
+            switch $pending
+                case --extractor --config
+                    set -a options "$pending" "$token"
+            end
+            set pending
+            continue
+        end
+        switch $token
+            case --extractor --config --output --session
+                set pending "$token"
+            case '--extractor=*' '--config=*'
+                set -a options "$token"
+        end
+    end
+    # ls already strips tabs/newlines/control characters from each cell.
+    # Suppress missing-source errors during completion and discard the header.
+    set -l rows (command oc-export ls $options 2>/dev/null)
+    or return
+    for row in $rows[2..-1]
+        set -l cells (string split \t -- "$row")
+        if test (count $cells) -eq 4
+            printf '%s\t%s — %s\n' "$cells[1]" "$cells[4]" "$cells[3]"
+        end
+    end
+end
 
-# Positional arguments: JSON/JSONL export files
-complete -c oc-export -n "not __fish_seen_subcommand_from ls; and not __fish_seen_argument --session --output --help -h" -F
+complete -c oc-export -s h -l help -f -d "Show help for this command"
+complete -c oc-export -l extractor -x -a "opencode opencode2 claude pi codex" -d "Local session source"
+complete -c oc-export -l config -rF -d "Read settings from a JSON or JSONC file"
+complete -c oc-export -n "not __fish_seen_subcommand_from ls" -l session -x -a '(__oc_export_sessions)' -d "Session ID (full ID or unique last 8 characters)"
+complete -c oc-export -n "not __fish_seen_subcommand_from ls" -l output -rF -d "Output base path"
+complete -c oc-export -n "not __fish_seen_subcommand_from ls" -l raw -f -d "Skip HTML sanitization"
+complete -c oc-export -n "not __fish_seen_subcommand_from ls" -l no-raw -f -d "Enable HTML sanitization (default)"
+complete -c oc-export -n "not __fish_seen_subcommand_from ls" -l summarize -f -d "Summarize thinking and tool calls using llm"
+complete -c oc-export -n "__fish_seen_subcommand_from ls" -l json -f -d "Print a JSON array for scripts and agents"
 
-complete -c oc-export -n "not __fish_seen_subcommand_from ls" -a ls -d "List recent sessions"
+complete -c oc-export -n "not __fish_seen_subcommand_from ls; and not __fish_seen_argument -l session -l help -s h" -F
+complete -c oc-export -n "not __fish_seen_subcommand_from ls; and not __fish_seen_argument -l session" -a ls -d "List recent sessions"
 complete -c oc-export -n "__fish_seen_subcommand_from ls" -a "(__fish_complete_directories)" -f

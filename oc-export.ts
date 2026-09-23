@@ -16,11 +16,11 @@ function htmlOutputPath(outputArg: string): string {
 async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
   if (parsed.help) {
-    showHelp();
+    showHelp(parsed.command);
     return;
   }
   if (parsed.error !== undefined) {
-    console.error(`Error: ${parsed.error}`);
+    console.error(`Error: ${parsed.error}\nRun oc-export --help for usage.`);
     process.exit(1);
   }
   const args = parsed.args;
@@ -30,7 +30,7 @@ async function main(): Promise<void> {
     config.extractor = args.extractor;
   }
   if (args.command === "ls") {
-    await listSessions(config, args.directory);
+    await listSessions(config, args.directory, args.json);
     return;
   }
   const sanitize = !(args.raw ?? config.raw);

@@ -4,6 +4,7 @@ import { getSources } from "./sources/index.js";
 export interface ParsedArgs {
   command?: "ls";
   directory?: string;
+  json?: boolean;
   extractor?: string;
   raw?: boolean;
   config?: string;
@@ -14,7 +15,7 @@ export interface ParsedArgs {
 }
 
 export type ParseArgsResult =
-  | { help: true }
+  | { help: true; command?: "ls" }
   | { help: false; error: string }
   | { help: false; error?: undefined; args: ParsedArgs };
 
@@ -26,46 +27,92 @@ function sourceList(): string {
     .join(", ");
 }
 
-export function showHelp(): void {
-  console.log(`Usage: oc-export [options] [file.json ...]
-       oc-export ls [options] [directory]
+export function showHelp(command?: "ls"): void {
+  const shared = `  --extractor <name>  Local session source: ${sourceList()}
+  --config <path>     Read settings from a JSON or JSONC file
+  --help, -h          Show help for this command`;
+  const config = `Settings: ${DEFAULT_CONFIG_PATH}
+CLI flags override config values; config values override defaults.
+Exit status: 0 on success (including an empty list); 1 on error.
+Errors go to stderr. Options accept --flag value or --flag=value.`;
 
-Render chat sessions to standalone HTML files.
+  if (command === "ls") {
+    console.log(`Usage: oc-export ls [options] [directory]
+       npx oc-export ls [options] [directory]
 
-Commands:
-  ls                 List recent sessions without exporting or prompting
-                     Optional directory filters by exact working directory
+List recent local sessions without prompting or exporting.
+The directory filter matches the exact working directory, not subdirectories.
+Results are newest first. Filtering happens before the configured limit:
+picker.limit (default: 20), overridden by claude.limit, pi.limit, or codex.limit.
 
 Options:
-  --extractor <name>  Session source: ${sourceList()}
-  --session <id>      Export a session by full ID or last 8 characters and render it
-  --output <name>     Rename both output files to <name>.jsonl and <name>.html
-  --raw               Skip sanitization
-  --no-raw            Enable sanitization (default, overrides raw: true in config)
-  --summarize         Summarize thinking and tool-call blocks using llm
-  --config <path>     Use a custom config file (default: ${DEFAULT_CONFIG_PATH})
-  --help, -h          Show this help message
+  --json             Print a JSON array for scripts and agents; empty result: []
+${shared}
 
-Config file:
-  Settings are read from ${DEFAULT_CONFIG_PATH} if it exists.
-  CLI flags override config values. Config values override defaults.
+Output:
+  Default: tab-separated ID, UPDATED (UTC), DIRECTORY, TITLE, with a header.
+  Empty result: No sessions found.
+  JSON: objects with id, title, directory, time_updated (Unix milliseconds),
+        and optional source-specific fields such as cost.
+  Listing metadata is not sanitized. Export-only options are not accepted.
+
+${config}
 
 Examples:
-  oc-export ls --extractor codex .         # recent Codex sessions in this directory
-  oc-export ls                            # recent sessions from the configured source
-  oc-export                               # interactive picker (default: opencode)
-  oc-export --extractor claude            # interactive picker for Claude Code
-  oc-export --extractor pi                # interactive picker for Pi
-  oc-export --extractor codex             # interactive picker for OpenAI Codex
-  oc-export --extractor opencode2         # interactive picker for OpenCode V2
-  oc-export --extractor claude --session abc123
-  oc-export --extractor pi --session abc123
-  oc-export --extractor codex --session abc123
-  oc-export --extractor opencode2 --session abc123
-  oc-export --output report               # picker with custom output names
-  oc-export session.jsonl                 # render a JSONL file
-  oc-export session.json                  # render a JSON file
-  oc-export --config ~/.oc-export.jsonc
+  npx oc-export ls --extractor codex .
+  npx oc-export ls --extractor codex --json
+  npx oc-export ls --config ./config.jsonc /path/to/project
+
+Use a full ID from the list with oc-export --extractor <name> --session <id>.
+`);
+    return;
+  }
+
+  console.log(`Usage: oc-export [options] [file.json|file.jsonl ...]
+       oc-export ls [options] [directory]
+       npx oc-export [options] [file.json|file.jsonl ...]
+
+Export local chat sessions and render standalone HTML files.
+
+Choose a workflow:
+  No files or --session  Open an interactive session picker (requires a terminal)
+  --session <id>        Export and render a session without prompting
+  file.json[l] ...      Render existing exports; input format is auto-detected
+  ls [directory]        List recent sessions without prompting or exporting
+                        Run oc-export ls --help for filters and JSON output
+
+Shared options:
+${shared}
+
+Export and render options:
+  --session <id>      Full session ID or unique last 8 characters; no input files
+  --output <path>     Output base path; accepts one file, --session, or the picker
+  --raw              Skip HTML sanitization
+  --no-raw           Enable HTML sanitization (default); overrides config raw: true
+  --summarize        Summarize thinking and tool calls; requires the llm CLI and
+                     summarize.enabled: true plus summarize.model in config
+
+Output files:
+  Session export: session-<last8>.jsonl and session-<last8>.html in this directory.
+  File input: HTML beside each input file; the input file is not changed.
+  --output report: report.jsonl + report.html for sessions; report.html for files.
+  Related child sessions may produce additional files. Existing outputs can be overwritten.
+  Sanitization applies to HTML; exported JSONL retains the original session data.
+  OpenCode sources require the opencode CLI to export sessions.
+
+${config}
+
+Examples (after publication, or use oc-export when installed globally):
+  npx oc-export --help
+  npx oc-export --extractor codex
+  npx oc-export ls --extractor codex --json
+  npx oc-export --extractor codex --session SESSION_ID --output report
+  npx oc-export session.jsonl
+  npx oc-export session.json --output report
+  npx oc-export --config ./config.jsonc ls
+
+For scripts and agents: use ls --json, then replace SESSION_ID with a returned full ID.
+Fish session completion is available in completions/oc-export.fish.
 `);
 }
 
@@ -81,7 +128,7 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     const arg = argv[i]!;
 
     if (arg === "--help" || arg === "-h") {
-      return { help: true };
+      return args.command === "ls" ? { help: true, command: "ls" } : { help: true };
     }
 
     // Split --flag=value into flag and inline value.
@@ -126,13 +173,15 @@ export function parseArgs(argv: string[]): ParseArgsResult {
         break;
       }
 
+      case "--json":
       case "--raw":
       case "--no-raw":
       case "--summarize": {
         if (inlineValue !== undefined) {
           return { help: false, error: `${flag} does not accept a value` };
         }
-        if (flag === "--raw") args.raw = true;
+        if (flag === "--json") args.json = true;
+        else if (flag === "--raw") args.raw = true;
         else if (flag === "--no-raw") args.raw = false;
         else args.summarize = true;
         break;
@@ -167,6 +216,10 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     }
     args.directory = args.files[0];
     args.files = [];
+  }
+
+  if (args.json && args.command !== "ls") {
+    return { help: false, error: "--json is only available with ls" };
   }
 
   return { help: false, args };
