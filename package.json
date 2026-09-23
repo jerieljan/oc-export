@@ -1,6 +1,6 @@
 {
   "name": "oc-export",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Export and render chat sessions to standalone HTML files.",
   "type": "module",
   "bin": {
