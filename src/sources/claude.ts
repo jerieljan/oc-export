@@ -24,7 +24,7 @@ interface ClaudeSessionIndex {
   originalPath?: string;
 }
 
-function isMetaPrompt(content: string): boolean {
+export function isMetaPrompt(content: string): boolean {
   const metaTags = [
     "<local-command-caveat>",
     "<local-command-stdout>",

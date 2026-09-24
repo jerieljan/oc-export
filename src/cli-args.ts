@@ -5,6 +5,9 @@ export interface ParsedArgs {
   command?: "ls";
   directory?: string;
   json?: boolean;
+  jsonExtended?: boolean;
+  all?: boolean;
+  limit?: number;
   extractor?: string;
   raw?: boolean;
   config?: string;
@@ -42,11 +45,15 @@ Errors go to stderr. Options accept --flag value or --flag=value.`;
 
 List recent local sessions without prompting or exporting.
 The directory filter matches the exact working directory, not subdirectories.
-Results are newest first. Filtering happens before the configured limit:
+Results are newest first. --all and --limit override the configured limit.
+Filtering happens before the configured limit:
 picker.limit (default: 20), overridden by claude.limit, pi.limit, or codex.limit.
 
 Options:
-  --json             Print a JSON array for scripts and agents; empty result: []
+  --json             Print the compatible JSON array; empty result: []
+  --json-extended    Print extended JSON with coverage, warnings, and provenance
+  --all              Retrieve all sessions, independently of picker limits
+  --limit <N>        Retrieve at most N sessions; overrides picker limits
 ${shared}
 
 Output:
@@ -54,6 +61,9 @@ Output:
   Empty result: No sessions found.
   JSON: objects with id, title, directory, time_updated (Unix milliseconds),
         and optional source-specific fields such as cost.
+  Extended JSON: schema_version, extractor, scope, coverage, warnings, sessions.
+  Extended JSON timestamps are UTC strings or null; results sort by activity.
+  Incomplete extended JSON scans emit JSON and exit 1; inspect coverage.scan_complete.
   Listing metadata is not sanitized. Export-only options are not accepted.
 
 ${config}
@@ -173,6 +183,17 @@ export function parseArgs(argv: string[]): ParseArgsResult {
         break;
       }
 
+      case "--limit": {
+        const value = takeValue();
+        if (!value || !/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+          return { help: false, error: "--limit requires a positive safe integer" };
+        }
+        args.limit = Number(value);
+        break;
+      }
+
+      case "--all":
+      case "--json-extended":
       case "--json":
       case "--raw":
       case "--no-raw":
@@ -180,7 +201,9 @@ export function parseArgs(argv: string[]): ParseArgsResult {
         if (inlineValue !== undefined) {
           return { help: false, error: `${flag} does not accept a value` };
         }
-        if (flag === "--json") args.json = true;
+        if (flag === "--all") args.all = true;
+        else if (flag === "--json-extended") args.jsonExtended = true;
+        else if (flag === "--json") args.json = true;
         else if (flag === "--raw") args.raw = true;
         else if (flag === "--no-raw") args.raw = false;
         else args.summarize = true;
@@ -218,6 +241,15 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     args.files = [];
   }
 
+  if (args.all && args.limit !== undefined) {
+    return { help: false, error: "--all and --limit cannot be combined" };
+  }
+  if (args.json && args.jsonExtended) {
+    return { help: false, error: "--json and --json-extended cannot be combined" };
+  }
+  if ((args.all || args.limit !== undefined || args.jsonExtended) && args.command !== "ls") {
+    return { help: false, error: "--all, --limit, and --json-extended are only available with ls" };
+  }
   if (args.json && args.command !== "ls") {
     return { help: false, error: "--json is only available with ls" };
   }

@@ -1,5 +1,6 @@
 import type { ResolvedConfig } from "./config.js";
 import { getSource } from "./sources/index.js";
+import { scanSessionInventory } from "./sources/inventory.js";
 import type { SessionRow } from "./sources/types.js";
 
 export function formatSessionList(rows: SessionRow[]): string {
@@ -21,8 +22,26 @@ export async function listSessions(
   config: ResolvedConfig,
   directory?: string,
   json = false,
+  options: { all?: boolean; limit?: number; jsonExtended?: boolean } = {},
 ): Promise<void> {
   const source = getSource(config.extractor);
-  const rows = await source.listSessions({ config, directory });
+  if (options.jsonExtended) {
+    const result = await scanSessionInventory(config, directory, options);
+    console.log(JSON.stringify(result));
+    if (!result.coverage.scan_complete) process.exitCode = 1;
+    return;
+  }
+  const limit = options.all ? Number.MAX_SAFE_INTEGER : options.limit;
+  const effectiveConfig =
+    limit === undefined
+      ? config
+      : {
+          ...config,
+          picker: { ...config.picker, limit },
+          codex: { ...config.codex, limit },
+          claude: { ...config.claude, limit },
+          pi: { ...config.pi, limit },
+        };
+  const rows = await source.listSessions({ config: effectiveConfig, directory });
   console.log(json ? JSON.stringify(rows) : formatSessionList(rows));
 }

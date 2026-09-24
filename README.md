@@ -172,7 +172,7 @@ tab-separated columns. Use an ID with `--session` to export it. Listings show lo
 metadata as stored, without export sanitization. An empty result prints
 `No sessions found.` and exits successfully.
 
-For scripts and agents, use JSON output:
+For the compatible JSON array, use `--json`:
 
 ```sh
 npx oc-export ls --extractor codex --json
@@ -183,7 +183,7 @@ Replace `SESSION_ID` with a full `id` returned by the first command. `--json`
 prints an array of objects with `id`, `title`, `directory`, and `time_updated`
 (Unix milliseconds); sources may also include `cost`. An empty result is `[]`.
 Errors go to stderr with exit status 1; successful listings exit with status 0.
-Both listing modes expose local metadata without sanitization. Neither prompts
+All listing modes expose local metadata without sanitization. Neither prompts
 for input or writes export files.
 
 The optional path matches the exact working directory, not its subdirectories.
@@ -191,6 +191,197 @@ Relative paths, trailing slashes, and symlinks are resolved before matching.
 Filtering happens before the configured limit (`picker.limit`, or `claude.limit`,
 `pi.limit`, or `codex.limit` for that source). Results show the newest sessions first.
 `--config` and `--extractor` work as usual; export-only flags are not accepted by `ls`.
+
+For complete retrieval, use `--all`. To set a caller-controlled cap, use
+`--limit N`, where N is a positive integer. These flags work with text, `--json`,
+and `--json-extended`, override picker/source limits, and cannot be combined. Without
+either flag, the existing configured limit still applies.
+
+For programmatic inventories, use extended JSON output:
+
+```sh
+oc-export ls --extractor codex --all --json-extended
+oc-export ls --extractor claude --limit 100 --json-extended /path/to/project
+```
+
+`--json-extended` and `--json` cannot be combined. Extended JSON has this shape:
+
+```json
+{
+  "schema_version": 1,
+  "extractor": "codex",
+  "scope": {
+    "store_id": "codex:<sha256-of-source-and-resolved-storage-locations>",
+    "roots": [
+      { "role": "sessions", "path": "/data/codex/sessions", "normalized_path": "/data/codex/sessions" },
+      { "role": "archives", "path": "/data/codex/archived_sessions", "normalized_path": "/data/codex/archived_sessions" },
+      { "role": "index", "path": "/data/codex/session_index.jsonl", "normalized_path": "/data/codex/session_index.jsonl" }
+    ],
+    "started_at": "2026-09-24T10:30:00.000Z",
+    "finished_at": "2026-09-24T10:30:00.500Z",
+    "archive_policy": "include_archive_root",
+    "follows_index_paths": false
+  },
+  "coverage": {
+    "effective_limit": null,
+    "directory": null,
+    "discovered_sessions": 0,
+    "matched_sessions": 0,
+    "returned_sessions": 0,
+    "truncated": false,
+    "scan_complete": true,
+    "status": "complete"
+  },
+  "warnings": [],
+  "sessions": []
+}
+```
+
+`scope` describes the scan, including configured locations, their resolved paths,
+and UTC start/end times. `store_id` hashes the extractor and resolved storage
+locations. It is stable across scans with the same configuration, independent of
+filters and limits. It is a **local configuration identifier**, not a durable
+store UUID or proof of session equivalence. A move or a changed symlink target
+can change it; identical paths on different machines can match. When combining
+inventories, key records by host, `scope.store_id`, and `identity`.
+`archive_policy` is `include_archive_root` for Codex, `include_archived_rows` for
+OpenCode, or `no_separate_archive_scan` for Claude/Pi. This describes scan policy,
+not a guarantee that an archive exists or was readable. `follows_index_paths`
+is true for Claude, whose index can reference transcripts outside the roots.
+
+`effective_limit: null` means no cap. The three counts describe discovered,
+matching, and returned sessions. `truncated` reports whether the cap removed
+known matching sessions; it does **not** mean the scan was complete.
+`scan_complete` is false if storage or records could not be checked. `status`
+is `complete`, `partial` (some storage could be read), or `unavailable` (no
+storage could be read). A complete scan with zero sessions is a valid empty result.
+Each warning has `code`, `path`, `message`, `affects_completeness`, nullable
+`session_id` and `session_identity`, and an optional one-based `line`.
+`unsupported_format` means a valid record layout is not supported;
+`malformed_record` means a record could not be parsed as a JSON object. Missing storage, unreadable storage, malformed records, invalid
+index entries, unavailable transcripts, skipped symlinks, and duplicate IDs are
+reported explicitly. Missing optional Codex archive/index paths and duplicate
+copies are warnings that do not by themselves make a scan incomplete.
+
+An incomplete extended JSON scan still writes its response to stdout and exits with
+status 1. Complete scans, including capped scans, exit with status 0. Invalid
+arguments or configuration errors go to stderr and may produce no JSON response.
+Subprocess libraries may reject on exit status 1; adapters must recover stdout
+from that error, validate `schema_version` and the response shape, and retain
+usable partial results. Callers should capture stdout even on status 1 and inspect coverage before
+interpreting an empty result as no activity. The legacy array keeps its existing
+fields and behavior, including its timestamp meaning and limited diagnostics.
+
+Extended JSON session fields:
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `extractor`, `identity` | Source ID, source name, and an identity formed as `extractor:id`. |
+| `canonical_identity` | Cross-store identity when established; currently always `null`. |
+| `title`, `title_basis` | Title with basis `index`, `session_metadata`, `first_user_message`, `database`, or `fallback`. Injected Codex context and Claude command metadata are excluded from prompt-derived titles using the same heuristics as legacy listings. |
+| `directory`, `directory_basis` | Recorded directory or `null`; basis is `session_metadata`, `index`, `database`, or `null`. Pi folder names are never decoded into guessed paths. |
+| `directory_semantics` | `initial_cwd` for Codex/Pi header directories; `first_observed_cwd` for Claude transcript directories; `project_path` for Claude index directories; `stored_directory` for OpenCode; otherwise `null`. This does not identify every project a session touched. |
+| `last_observed_activity_at` | Later of the message and tool timestamps, without fallback; `null` when no valid observed event time is available. Use this for ranking that excludes estimated activity. |
+| `extraction_status` | `complete` for a transcript with recognized activity events and no extraction failures; `partial` if record failures or conflicting copies may affect the result; `metadata_only` when only metadata was obtained. OpenCode database rows and unavailable indexed transcripts are metadata-only. |
+| `copies` | Source locations and their individual timestamps, bases, extraction status, directories, relationships, archive state, and export targets. Present even for a single copy. |
+| `last_message_at` | Latest recognized user/assistant message timestamp; `null` when unavailable. Never falls back to file, index, or database updates. |
+| `last_tool_event_at` | Latest recognized tool call/result timestamp; `null` when unavailable. It does not prove that a tool succeeded or is still running. |
+| `metadata_updated_at` | Index update time, falling back to file modification time; database update time for OpenCode. |
+| `last_activity_at`, `activity_basis` | Latest recognized conversation-event timestamp, or a labeled approximation. |
+| `parent_id`, `fork_session_id` | Parent or fork origin when recorded; otherwise `null`. |
+| `parent_ref`, `fork_ref` | Nullable references with `id`, `identity`, `store_id`, and `resolved`. Resolution uses the full scan before directory filtering and limits; `resolved: false` means the ID is known but its record was not found. Pi absolute parent paths are resolved only when they uniquely match a scanned copy. |
+| `export_session_id` | ID to pass to `--session` with the same extractor/configuration. Claude child sessions use their available parent; unavailable targets are `null`. This identifies an export target, not a guarantee that the export command or storage will remain available. |
+| `parent_session_path` | Pi's recorded parent-session file path, when available. |
+| `is_subagent` | Relationship indicator when available; `null` means unknown. A fork alone does not imply a subagent. |
+| `archived` | Whether a Codex copy is in archive storage, or an OpenCode archive timestamp is set. For merged rows, copies must agree; `null` means unavailable or mixed states. Inspect `copies` for individual states. |
+
+All extended JSON timestamp values are UTC ISO strings or `null`.
+`last_observed_activity_at` is the later of `last_message_at` and `last_tool_event_at`.
+`last_activity_at` uses that observed timestamp when available,
+with `activity_basis: "session_event"`. If neither is available, it uses a
+labeled approximation: `file_mtime`, `index_update`, or `database_update`.
+Unknown activity has a null timestamp and basis. OpenCode currently supplies
+only database update times, so its observed, message, and tool timestamps are null.
+Missing or invalid timestamps on recognized activity events produce an
+`invalid_activity_timestamp` warning, mark the transcript `partial`, and make
+the scan incomplete. Valid earlier observations remain available. A partial
+observed timestamp is a lower bound on activity found, not proof of the actual
+latest event. `metadata_only` describes extraction depth; consult scan coverage
+and warnings separately to distinguish a successful metadata read from a missing
+transcript. A header-only transcript is also metadata-only.
+
+Message events are Codex `response_item` user/assistant messages and `event_msg`
+user/agent messages, Claude user/assistant records, or Pi user/assistant messages.
+Tool events are Codex `response_item` function/custom-tool calls and outputs,
+Claude `tool_use`/`tool_result` content blocks, and Pi `toolCall` blocks or
+`toolResult` messages. Claude/Pi records containing only tool content advance
+the tool timestamp, not the message timestamp. Mixed text/tool records can
+advance both. Tool events use the enclosing record's timestamp; they are not
+measurements of continuous execution. Unsupported tool-event variants do not
+advance the tool timestamp. Other metadata events do not advance either field.
+
+File writes, index updates, and database updates are **approximations**, not
+proof of user activity. A recent timestamp never implies that an agent is running.
+Extended JSON sorts by activity, newest first, then identity, with unknown activity
+last. Legacy listings continue to sort by `time_updated`.
+
+The extended JSON file scan reads entire transcripts, including nested Claude
+subagent transcripts. This costs more I/O than the picker. Claude subagent IDs
+use `parent-session-id/agent-filename` because their embedded `sessionId` can
+refer to the parent. These composite IDs identify inventory records; the current
+Claude `--session` export workflow exports subagents through their parent; use
+`export_session_id` rather than deriving that target from the inventory ID.
+
+Copies with the same ID within one extractor/store are combined. Message and
+tool timestamps each take the maximum valid observation across copies. Observed
+evidence always takes precedence over file/index update approximations. Metadata
+update time also takes the maximum. Display metadata prefers copies with observed
+events, then the latest activity, then the source path as a deterministic tie-break.
+All original copy evidence remains in `copies`. Any partial copy makes the
+combined extraction partial. Otherwise it is complete if at least one copy has
+complete event extraction, or metadata-only if all copies are metadata-only.
+Conflicting known directories or relationships produce `conflicting_copies`,
+mark extraction partial and scan completeness false, and set the combined field
+to null. Unknown values alone are not conflicts. A conflicting directory will
+not pass the exact-directory filter; callers can inspect its copies when matching
+projects. Mixed archive states are retained per copy, with a null combined state. Scans do not follow symlinks or provide an atomic snapshot
+of files being written. Completeness describes the supported configured storage
+at scan time, not deleted sessions or every possible tool storage format.
+
+OpenCode and OpenCode2 IDs can overlap after a store migration or copy, but this
+repository does not establish that all matching IDs are the same logical session.
+Their identities remain separate and `canonical_identity` stays `null`; do not
+blindly add their counts or deduplicate them solely by ID. Choose an authoritative
+store, or reconcile records using migration information held by the caller.
+Parent and fork fields allow callers to count root sessions separately while
+including child activity. Exact-directory filtering remains available; callers
+that need descendant/project matching can fetch once per extractor with `--all`
+and apply their own matching to recorded directories.
+
+The machine-checkable contract is [inventory-extended.schema.json](schemas/inventory-extended.schema.json)
+(JSON Schema draft 2020-12), included in the published package. Inventory tests
+validate responses from every extractor, including partial and unavailable scans.
+The schema checks structure and known enum values; timestamp aggregation,
+reference resolution, and coverage consistency are also covered by behavioral tests.
+
+Compatibility rules for extended JSON output:
+
+- Consumers must check `schema_version` before interpreting a response.
+- New optional fields and new warning codes may be added within the same schema version. Ignore unknown
+  fields. Handle unknown warning codes using `affects_completeness` and the scan's
+  coverage instead of assuming success.
+- Removing fields, adding required fields, changing existing field types or
+  meanings, and adding values to closed enums require a new schema version.
+- Treat an unknown enum value as unsupported data; do not interpret it as complete
+  extraction or a trusted activity basis. The published schema rejects it.
+The extended JSON format starts at `schema_version: 1`. This version identifies
+the extended schema; it does not replace the existing `--json` array format.
+
+Integrations should probe the installed command for `--json-extended` support and
+validate a response against this schema. The repository build can be newer than
+the command on PATH. Rank by `last_observed_activity_at` for observed activity;
+retain estimated `last_activity_at` and `activity_basis` for display or an explicit
+fallback policy. Continue to accept valid partial JSON on exit status 1.
 
 Run the interactive picker to choose a recent session:
 

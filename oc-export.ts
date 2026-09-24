@@ -30,7 +30,7 @@ async function main(): Promise<void> {
     config.extractor = args.extractor;
   }
   if (args.command === "ls") {
-    await listSessions(config, args.directory, args.json);
+    await listSessions(config, args.directory, args.json, args);
     return;
   }
   const sanitize = !(args.raw ?? config.raw);

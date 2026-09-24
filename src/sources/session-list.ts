@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { SessionRow } from "./types.js";
 
-function normalizeDirectory(directory: string): string {
+export function normalizeDirectory(directory: string): string {
   const absolute = path.resolve(directory);
   try {
     return fs.realpathSync(absolute);

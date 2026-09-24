@@ -157,7 +157,7 @@ function readSessionIndex(indexPath: string): Map<string, CodexIndexEntry> {
  * a tag such as <environment_context>; real prompts never do. Good enough
  * for title fallback without parsing the whole file.
  */
-function isInjectedPrompt(text: string): boolean {
+export function isInjectedPrompt(text: string): boolean {
   return text.trimStart().startsWith("<");
 }
 

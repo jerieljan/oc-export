@@ -16,7 +16,7 @@ function __oc_export_sessions
             continue
         end
         switch $token
-            case --extractor --config --output --session
+            case --extractor --config --output --session --limit
                 set pending "$token"
             case '--extractor=*' '--config=*'
                 set -a options "$token"
@@ -47,3 +47,7 @@ complete -c oc-export -n "__fish_seen_subcommand_from ls" -l json -f -d "Print a
 complete -c oc-export -n "not __fish_seen_subcommand_from ls; and not __fish_seen_argument -l session -l help -s h" -F
 complete -c oc-export -n "not __fish_seen_subcommand_from ls; and not __fish_seen_argument -l session" -a ls -d "List recent sessions"
 complete -c oc-export -n "__fish_seen_subcommand_from ls" -a "(__fish_complete_directories)" -f
+
+complete -c oc-export -n "__fish_seen_subcommand_from ls" -l json-extended -f -d "Extended JSON with coverage and diagnostics"
+complete -c oc-export -n "__fish_seen_subcommand_from ls" -l all -f -d "Retrieve all sessions"
+complete -c oc-export -n "__fish_seen_subcommand_from ls" -l limit -x -d "Maximum sessions, independently of picker limits"
